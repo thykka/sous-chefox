@@ -18,7 +18,8 @@ export type Replacement = { start: number; end: number; text: string; original?:
 type Quantity = { start: number; end: number; amountEnd: number; unitStart: number; amounts: number[]; unit: Unit };
 
 /**
- * A quantity in metric. `whole` amounts are exact, so they're shown in whole units;
+ * A quantity in metric. `whole` amounts are exact (one stick of butter is 113 g), so
+ * unscaled they're shown in whole units rather than rounded;
  * `metric` ones were written in metric to begin with; a `packageSize` ("2 (14 oz) cans")
  * stays the same when the recipe is scaled, since the count changes instead.
  */
@@ -100,7 +101,7 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
         : formatMetric(
             measure.values.map((value) => value * scale),
             measure.dimension,
-            { locale: options.locale, whole: measure.whole },
+            { locale: options.locale, whole: measure.whole && scale === 1 },
           );
     return joined ? { start, end, text, original: line.trim() } : { start, end, text };
   });
@@ -328,7 +329,8 @@ function toMetric(quantities: Quantity[], ingredient: IngredientMatch): Measure[
       push(unit.dimension, unit.size);
     } else if (unit.stick) {
       if (ingredient?.kind !== "dry" || !ingredient.sticks) return null;
-      push("weight", unit.size, true);
+      // Only a single stick has a well-known exact weight; other amounts round as usual.
+      push("weight", unit.size, amounts.length === 1 && amounts[0] === 1);
     } else if (unit.ounce && ingredient?.kind === "liquid") {
       push("volume", FLUID_OUNCE_ML);
     } else if (unit.dimension === "volume" && ingredient?.kind === "dry") {

@@ -10,7 +10,7 @@ export type FormatOptions = { locale?: string | undefined; whole?: boolean };
 /**
  * A metric amount, or a range of two, rounded to what a cook would measure:
  * "240 ml", "1.5 l", "470–710 ml", "950 ml–1.4 l". `whole` amounts are exact
- * figures ("113 g" of butter), only rounded to whole units.
+ * figures ("113 g" for a stick of butter), only rounded to whole units.
  */
 export function formatMetric(values: number[], dimension: Dimension, options: FormatOptions = {}): string {
   const number = new Intl.NumberFormat(options.locale ?? globalThis.navigator?.language, { maximumFractionDigits: 1 });
@@ -31,11 +31,10 @@ function metricAmount(value: number, dimension: Dimension, round: boolean): { am
   return { amount: rounded, unit: names.small };
 }
 
-// Below the smallest step a whole amount would round to zero, so tiny amounts keep a decimal.
+// Below 2.5 the first step would round to zero, so tiny amounts keep a decimal instead.
 function roundMetric(value: number, dimension: Dimension): number {
-  const smallestStep = dimension === "volume" ? 2.5 : 1;
-  if (value < smallestStep) return roundTo(value, 0.1);
-  if (value < 15) return roundTo(value, smallestStep);
+  if (value < 2.5) return roundTo(value, 0.1);
+  if (value < 15 && dimension === "volume") return roundTo(value, 2.5);
   if (value < 100) return roundTo(value, 5);
   if (value < 1000) return roundTo(value, 10);
   return value;

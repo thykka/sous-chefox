@@ -71,8 +71,9 @@ describe("rewriteLine rounds to amounts a cook would measure", () => {
     ["nearest 10 under 1000 ml", "3 cups stock", "710 ml stock"],
     ["rounding up into litres", "4¼ cups stock", "1 l stock"],
     ["litres with one decimal", "6 cups stock", "1.4 l stock"],
-    ["under 1 g: one decimal", "1/32 oz saffron", "0.9 g saffron"],
-    ["whole grams under 15 g", "½ oz yeast", "14 g yeast"],
+    ["under 2.5 g: one decimal", "1/32 oz saffron", "0.9 g saffron"],
+    ["nearest 5 from 2.5 g", "⅛ oz yeast", "5 g yeast"],
+    ["nearest 5 under 15 g", "½ oz yeast", "15 g yeast"],
     ["nearest 5 under 100 g", "3 oz pancetta", "85 g pancetta"],
     ["nearest 10 under 1000 g", "¼ lb bacon", "110 g bacon"],
     ["kilograms with one decimal", "2.5 lb pork shoulder", "1.1 kg pork shoulder"],
@@ -179,7 +180,7 @@ describe("rewriteLine weighs dry ingredients", () => {
     ["oats", "1 cup old-fashioned rolled oats", "90 g old-fashioned rolled oats"],
     ["rice", "1 cup long-grain white rice", "200 g long-grain white rice"],
     ["cocoa", "⅔ cup cocoa powder (sifted if lumpy)", "55 g cocoa powder (sifted if lumpy)"],
-    ["cornstarch", "2 tbsp cornstarch", "14 g cornstarch"],
+    ["cornstarch", "2 tbsp cornstarch", "15 g cornstarch"],
     ["chocolate chips", "½ cup dark chocolate chips", "85 g dark chocolate chips"],
     ["ingredient named first", "Flour, 1 cup", "Flour, 120 g"],
     ["preparation words", "1 cup all-purpose flour, sifted", "120 g all-purpose flour, sifted"],
@@ -219,8 +220,8 @@ describe("rewriteLine weighs dry ingredients", () => {
 describe("rewriteLine converts sticks of butter", () => {
   it.each([
     ["one stick", "1 stick butter", "113 g butter"],
-    ["two sticks", "2 sticks unsalted butter, softened", "226 g unsalted butter, softened"],
-    ["half a stick", "½ stick butter", "57 g butter"],
+    ["two sticks", "2 sticks unsalted butter, softened", "230 g unsalted butter, softened"],
+    ["half a stick", "½ stick butter", "55 g butter"],
     ["stick plus spoons", "1 stick plus 2 tbsp butter", "140 g butter"],
   ])("%s: %s → %s", (_, line, expected) => {
     expect(rewriteLine(line, metric)).toBe(expected);
@@ -266,7 +267,7 @@ describe("rewriteLine prefers a metric amount already in the line", () => {
     ["metric after the name", "1 cup granulated sugar (200g)", "200g granulated sugar"],
     ["metric after the name with words", "1 cup flour (about 120 g), sifted", "120 g flour, sifted"],
     ["two imperial amounts for one", "1 cup (2 sticks) butter", "230 g butter"],
-    ["two imperial amounts, sticks first", "2 sticks (1 cup) butter", "226 g butter"],
+    ["two imperial amounts, sticks first", "2 sticks (1 cup) butter", "230 g butter"],
     ["two imperial amounts of different kinds", "8 oz (1 cup) sour cream", "230 g sour cream"],
   ])("%s: %s → %s", (_, line, expected) => {
     expect(rewriteLine(line, metric)).toBe(expected);
@@ -357,6 +358,7 @@ describe("rewriteLine scales metric amounts", () => {
     ["metric after the name", "1 cup milk (240 ml)", 2, "480 ml milk"],
     ["metric not in parentheses", "1 cup milk, or 240 ml", 2, "470 ml milk, or 480 ml"],
     ["stick", "1 stick butter", 1.5, "170 g butter"],
+    ["stick, doubled", "1 stick butter", 2, "230 g butter"],
   ])("%s: %s × %s → %s", (_, line, scale, expected) => {
     expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
   });

@@ -101,7 +101,8 @@ export function attachToSelection(
   if (lines.some(isManaged)) return null;
   const texts = lines.flatMap(textLinesOf).map(lineText);
   if (lines.length === 0 || !texts.some(hasAmount)) return null;
-  // A list selected from its first item gets the control above the list, as for `attach`.
+  // A selection from a list's first item gets the control above the list itself, so it
+  // sits directly above the selection without landing inside the list.
   const list = lines[0]!.closest("ul, ol");
   const fromFirstItem =
     list !== null &&
@@ -151,9 +152,9 @@ function createController(target: Target, initial: Settings, messages: Messages)
   for (const line of lines) managed.add(line);
 
   const renderIngredients = () => {
-    // A recipe that's already metric has nothing to convert until it's scaled.
-    if (target.metricRecipe && scale === 1) return nothing;
-    const options = { scale, metric: settings.metric };
+    // A recipe that's already metric is only ever scaled, in the units it's written in,
+    // so its spoons stay spoons.
+    const options = { scale, metric: settings.metric && !target.metricRecipe };
     return rewriteLines(target.ingredients, (line) => findReplacements(line, options));
   };
   // Instructions are only converted: scaling never changes them.
