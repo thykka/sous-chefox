@@ -8,7 +8,12 @@ import { selectedLines } from "./selection";
 import { parseServings } from "./servings";
 import { textLinesOf } from "./visibleText";
 
-export type Settings = { metric: boolean; siteDisabled: boolean };
+/**
+ * What the user chose. `kitchen` writes converted volumes in Finnish kitchen units
+ * (dl, rkl, tl) and `decimals` writes amounts as "0,5" rather than "½"; both are off
+ * unless given, and the Firefox wrapper always gives them.
+ */
+export type Settings = { metric: boolean; siteDisabled: boolean; kitchen?: boolean; decimals?: boolean };
 
 export interface RecipeController {
   /** Same effect as using the scaling control. */
@@ -19,8 +24,15 @@ export interface RecipeController {
   revert(): void;
 }
 
+/** A controller that can tell whether its rewrite is still on the page. */
+type Controller = RecipeController & { isConnected(): boolean };
+
 /** Converts the page's recipe in place, or returns null when the page isn't handled. */
 export function attach(doc: Document, settings: Settings, messages: Messages = ENGLISH): RecipeController | null {
+  return attachController(doc, settings, messages);
+}
+
+function attachController(doc: Document, settings: Settings, messages: Messages): Controller | null {
   if (settings.siteDisabled) return null;
   const recipe = detectRecipe(doc);
   if (!recipe) return null;
@@ -52,21 +64,73 @@ const WATCH_MS = 4000;
 /** The shortest gap between two tries at attaching while the page keeps changing. */
 const RETRY_MS = 100;
 
+/** How long after attaching the page is watched for a site re-rendering the recipe. */
+const REATTACH_MS = 10000;
+
 /**
  * Like `attach`, but when a recipe page's ingredient list isn't there yet, watches the
- * page for a few seconds in case it's rendered late, then stops for good.
+ * page for a few seconds in case it's rendered late, then stops for good. Once attached,
+ * it keeps watching a while longer: sites that render on the server and then hydrate
+ * (React, as on bbc.co.uk) re-render a recipe they didn't write themselves, throwing the
+ * rewrite away, so it's attached again to the new markup.
  */
 export function attachWhenReady(
   doc: Document,
   settings: Settings,
   messages: Messages = ENGLISH,
 ): Promise<RecipeController | null> {
-  const controller = attach(doc, settings, messages);
+  return waitForList(doc, settings, messages).then(
+    (controller) => controller && keepAttached(doc, controller, settings, messages),
+  );
+}
+
+/**
+ * A controller that follows the recipe through re-renders for `REATTACH_MS`: whenever
+ * the rewrite disappears from the page, the recipe is attached again with the latest
+ * settings, at 1×.
+ */
+function keepAttached(doc: Document, first: Controller, settings: Settings, messages: Messages): RecipeController {
+  let current = first;
+  let latest = settings;
+  let stopped = false;
+  const view = doc.defaultView ?? globalThis;
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  const reattach = () => {
+    retry = null;
+    if (stopped || current.isConnected()) return;
+    current.revert();
+    current = attachController(doc, latest, messages) ?? current;
+  };
+  const observer = new view.MutationObserver(() => {
+    retry ??= view.setTimeout(reattach, RETRY_MS);
+  });
+  const stop = () => {
+    stopped = true;
+    observer.disconnect();
+    if (retry !== null) view.clearTimeout(retry);
+  };
+  observer.observe(doc.body!, { childList: true, subtree: true });
+  view.setTimeout(stop, REATTACH_MS);
+  return {
+    setScale: (factor) => current.setScale(factor),
+    setSettings(next) {
+      latest = next;
+      current.setSettings(next);
+    },
+    revert() {
+      stop();
+      current.revert();
+    },
+  };
+}
+
+function waitForList(doc: Document, settings: Settings, messages: Messages): Promise<Controller | null> {
+  const controller = attachController(doc, settings, messages);
   if (controller || settings.siteDisabled || !detectRecipe(doc) || !doc.body) return Promise.resolve(controller);
   const view = doc.defaultView ?? globalThis;
   return new Promise((resolve) => {
     let retry: ReturnType<typeof setTimeout> | null = null;
-    const finish = (result: RecipeController | null) => {
+    const finish = (result: Controller | null) => {
       observer.disconnect();
       view.clearTimeout(deadline);
       if (retry !== null) view.clearTimeout(retry);
@@ -74,7 +138,7 @@ export function attachWhenReady(
     };
     const tryAttach = () => {
       retry = null;
-      const attached = attach(doc, settings, messages);
+      const attached = attachController(doc, settings, messages);
       if (attached) finish(attached);
     };
     const observer = new view.MutationObserver(() => {
@@ -140,7 +204,7 @@ function isManaged(line: Element): boolean {
   return [...line.querySelectorAll("*")].some((el) => managed.has(el));
 }
 
-function createController(target: Target, initial: Settings, messages: Messages): RecipeController {
+function createController(target: Target, initial: Settings, messages: Messages): Controller {
   let settings = initial;
   // The scale always starts at 1 and is never saved.
   let scale = 1;
@@ -154,7 +218,12 @@ function createController(target: Target, initial: Settings, messages: Messages)
   const renderIngredients = () => {
     // A recipe that's already metric is only ever scaled, in the units it's written in,
     // so its spoons stay spoons.
-    const options = { scale, metric: settings.metric && !target.metricRecipe };
+    const options = {
+      scale,
+      metric: settings.metric && !target.metricRecipe,
+      kitchen: settings.kitchen ?? false,
+      decimals: settings.decimals ?? false,
+    };
     return rewriteLines(target.ingredients, (line) => findReplacements(line, options));
   };
   // Instructions are only converted: scaling never changes them.
@@ -203,15 +272,18 @@ function createController(target: Target, initial: Settings, messages: Messages)
   if (!settings.siteDisabled) mount();
   return {
     setScale,
+    // A disabled site has nothing on the page to lose; a reverted controller has lost it.
+    isConnected: () => !reverted && (control === null ? settings.siteDisabled : control.isConnected() && target.anchor.isConnected),
     setSettings(next) {
       if (reverted) return;
-      const metricChanged = next.metric !== settings.metric;
+      const formatChanged =
+        next.metric !== settings.metric || next.kitchen !== settings.kitchen || next.decimals !== settings.decimals;
       settings = next;
       if (next.siteDisabled) {
         unmount();
       } else if (!control) {
         mount();
-      } else if (metricChanged) {
+      } else if (formatChanged) {
         unrender();
         render();
       }

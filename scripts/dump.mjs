@@ -1,7 +1,10 @@
 // Shows what `attach` does to a saved page: the list it locates, every ingredient line
 // before and after, the instruction steps it changes, and the ingredients scaled.
 //
-//   npm run dump -- <fixture name or path> [--scale <factor>] [--imperial]
+//   npm run dump -- <fixture name or path> [--scale <factor>] [--imperial] [--ml] [--fractions]
+//
+// Like the extension it writes volumes in dl, rkl and tl and amounts as decimals, unless
+// --ml or --fractions says otherwise.
 //
 // The output is a draft to check by hand against the page: expectations in tests are
 // worked out from the recipe, never pasted from here unchecked.
@@ -12,11 +15,16 @@ import { createServer } from "vite";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { scale: { type: "string", default: "2" }, imperial: { type: "boolean" } },
+  options: {
+    scale: { type: "string", default: "2" },
+    imperial: { type: "boolean" },
+    ml: { type: "boolean" },
+    fractions: { type: "boolean" },
+  },
 });
 const [page] = positionals;
 if (!page) {
-  console.error("Usage: npm run dump -- <fixture name or path> [--scale <factor>] [--imperial]");
+  console.error("Usage: npm run dump -- <fixture name or path> [--scale <factor>] [--imperial] [--ml] [--fractions]");
   process.exit(1);
 }
 const fixture = new URL(`../test/fixtures/${page.replace(/\.html$/, "")}.html`, import.meta.url);
@@ -37,13 +45,16 @@ try {
   const { attach } = await vite.ssrLoadModule("/src/core/attach.ts");
   const { detectRecipe } = await vite.ssrLoadModule("/src/core/detectRecipe.ts");
   const { locateList } = await vite.ssrLoadModule("/src/core/locateList.ts");
-  const { linesOf } = await vite.ssrLoadModule("/src/core/pageRewriter.ts");
-  dump({ attach, detectRecipe, locateList, linesOf });
+  const { linesOf, lineText } = await vite.ssrLoadModule("/src/core/pageRewriter.ts");
+  const { textLinesOf } = await vite.ssrLoadModule("/src/core/visibleText.ts");
+  // A line as the rewriter reads it: cells and blocks apart, as on the page.
+  const read = (line) => textLinesOf(line).map(lineText).join(" ").replace(/\s+/g, " ");
+  dump({ attach, detectRecipe, locateList, linesOf, read });
 } finally {
   await vite.close();
 }
 
-function dump({ attach, detectRecipe, locateList, linesOf }) {
+function dump({ attach, detectRecipe, locateList, linesOf, read }) {
   const doc = load();
   const recipe = detectRecipe(doc);
   if (!recipe) return console.log("No recipe data: attach leaves the page alone.");
@@ -53,17 +64,17 @@ function dump({ attach, detectRecipe, locateList, linesOf }) {
   const original = load();
   const stepsList = locateList(original, recipe.instructions);
   const stepsSelector = stepsList && selectorFor(stepsList);
-  const stepsBefore = stepsList ? linesOf(stepsList).map((line) => line.textContent.trim()) : [];
+  const stepsBefore = stepsList ? linesOf(stepsList).map((line) => read(line).trim()) : [];
 
-  const controller = attach(doc, { metric: !values.imperial, siteDisabled: false });
+  const controller = attach(doc, { metric: !values.imperial, kitchen: !values.ml, decimals: !values.fractions, siteDisabled: false });
   if (!controller) return console.log("No ingredient list located confidently: attach leaves the page alone.");
 
   const list = doc.querySelector("sous-chefox-scale").nextElementSibling;
   const lines = linesOf(list);
-  const before = linesOf(original.querySelector(selectorFor(list))).map((line) => line.textContent);
+  const before = linesOf(original.querySelector(selectorFor(list))).map(read);
   console.log(`\nIngredient list: ${selectorFor(list)} (each line a ${describe(lines[0])})`);
   lines.forEach((line, i) => {
-    const after = line.textContent;
+    const after = read(line);
     console.log(after === before[i] ? `  = ${q(after)}` : `  ${q(before[i])}\n    → ${q(after)}`);
   });
 
@@ -72,7 +83,7 @@ function dump({ attach, detectRecipe, locateList, linesOf }) {
   } else {
     const steps = linesOf(doc.querySelector(stepsSelector));
     console.log(`\nSteps: ${stepsSelector} (each step a ${describe(steps[0])}), changed by index:`);
-    const changed = steps.map((step, i) => [i, step.textContent.trim()]).filter(([i, text]) => text !== stepsBefore[i]);
+    const changed = steps.map((step, i) => [i, read(step).trim()]).filter(([i, text]) => text !== stepsBefore[i]);
     if (changed.length === 0) console.log("  none");
     for (const [i, text] of changed) console.log(`  ${i}: ${q(text)}`);
     for (const mark of doc.querySelectorAll(`${stepsSelector} .sous-chefox-converted`)) {
@@ -83,7 +94,7 @@ function dump({ attach, detectRecipe, locateList, linesOf }) {
   const scale = Number(values.scale);
   controller.setScale(scale);
   console.log(`\nIngredients at ${scale}×:`);
-  for (const line of lines) console.log(`  ${q(line.textContent)}`);
+  for (const line of lines) console.log(`  ${q(read(line))}`);
 }
 
 /** A line's tag and classes, as in "li.wprm-recipe-ingredient". */

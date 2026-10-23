@@ -19,6 +19,14 @@
     "message": "A number from 0.1 to 20",
     "description": "Tooltip of the scale factor input, describing what it accepts."
   },
+  "scaleHalve": {
+    "message": "Halve",
+    "description": "Tooltip of the button that halves the recipe's scale factor."
+  },
+  "scaleDouble": {
+    "message": "Double",
+    "description": "Tooltip of the button that doubles the recipe's scale factor."
+  },
   "servingsLabel": {
     "message": "Servings",
     "description": "Label of the servings stepper above a recipe's ingredient list."
@@ -34,6 +42,14 @@
   "popupMetric": {
     "message": "Convert to metric",
     "description": "Popup switch that turns conversion to metric units on or off."
+  },
+  "popupKitchenUnits": {
+    "message": "Use dl, rkl and tl",
+    "description": "Popup switch that writes converted volumes in Finnish kitchen units (decilitres, tablespoons, teaspoons) instead of millilitres."
+  },
+  "popupDecimals": {
+    "message": "Decimals instead of fractions (0.5, not ½)",
+    "description": "Popup switch that writes scaled and converted amounts as decimals rather than common fractions."
   },
   "popupDisableSite": {
     "message": "Disable on this site",

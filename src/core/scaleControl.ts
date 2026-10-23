@@ -3,6 +3,8 @@ export type Messages = {
   scaleLabel: string;
   scaleReset: string;
   scaleHint: string;
+  scaleHalve: string;
+  scaleDouble: string;
   servingsLabel: string;
   servingsFewer: string;
   servingsMore: string;
@@ -12,6 +14,8 @@ export const ENGLISH: Messages = {
   scaleLabel: "Scale",
   scaleReset: "Reset",
   scaleHint: "A number from 0.1 to 20",
+  scaleHalve: "Halve",
+  scaleDouble: "Double",
   servingsLabel: "Servings",
   servingsFewer: "Fewer servings",
   servingsMore: "More servings",
@@ -28,6 +32,8 @@ export interface ScaleControl {
   /** Shows `factor` in the input, replacing whatever was typed, and in the stepper. */
   show(factor: number): void;
   remove(): void;
+  /** Whether the control is still on the page, as a re-rendering site may remove it. */
+  isConnected(): boolean;
 }
 
 const TAG = "sous-chefox-scale";
@@ -76,7 +82,8 @@ export type ScaleControlOptions = {
  * The scaling control, in a shadow root directly above `anchor` so the site's styles
  * can't reach it. One scale factor drives it: the stepper shows the servings it gives
  * and the multiplier shows the factor itself. A valid multiplier calls `onScale`;
- * anything else is highlighted and left exactly as typed. Reset calls `onReset`.
+ * anything else is highlighted and left exactly as typed. "½×" and "2×" halve and
+ * double the last factor applied, as far as the range allows. Reset calls `onReset`.
  */
 export function createScaleControl(anchor: Element, options: ScaleControlOptions): ScaleControl {
   const { messages, servings, onScale, onReset } = options;
@@ -94,23 +101,39 @@ export function createScaleControl(anchor: Element, options: ScaleControlOptions
   input.inputMode = "decimal";
   input.title = messages.scaleHint;
   label.append(messages.scaleLabel, input, "×");
+  const halve = button(doc, "halve", "½×", messages.scaleHalve);
+  const double = button(doc, "double", "2×", messages.scaleDouble);
   const reset = button(doc, "reset", messages.scaleReset);
   const stepper = servings === null ? null : createStepper(doc, servings, messages, (factor) => {
     if (onScale(factor)) control.show(factor);
   });
   if (stepper) bar.append(stepper.element);
-  bar.append(label, reset);
+  bar.append(label, halve, double, reset);
   root.append(style, bar);
 
   const setInvalid = (invalid: boolean) => {
     if (invalid) input.setAttribute("aria-invalid", "true");
     else input.removeAttribute("aria-invalid");
   };
+  // The last factor applied: what the halve and double buttons start from, even while
+  // the input holds something invalid.
+  let current = 1;
+  const applied = (factor: number) => {
+    current = factor;
+    halve.disabled = !isValidScale(factor / 2);
+    double.disabled = !isValidScale(factor * 2);
+    stepper?.show(factor);
+  };
   input.addEventListener("input", () => {
     const factor = parseMultiplier(input.value);
     setInvalid(factor === null);
-    if (factor !== null && onScale(factor)) stepper?.show(factor);
+    if (factor !== null && onScale(factor)) applied(factor);
   });
+  const multiply = (by: number) => {
+    if (onScale(current * by)) control.show(current * by);
+  };
+  halve.addEventListener("click", () => multiply(0.5));
+  double.addEventListener("click", () => multiply(2));
   reset.addEventListener("click", onReset);
 
   const format = new Intl.NumberFormat(globalThis.navigator?.language, { maximumFractionDigits: 2, useGrouping: false });
@@ -118,7 +141,10 @@ export function createScaleControl(anchor: Element, options: ScaleControlOptions
     show(factor) {
       input.value = format.format(factor);
       setInvalid(false);
-      stepper?.show(factor);
+      applied(factor);
+    },
+    isConnected() {
+      return host.isConnected;
     },
     remove() {
       host.remove();

@@ -7,6 +7,8 @@ const messages: Messages = {
   scaleLabel: browser.i18n.getMessage("scaleLabel"),
   scaleReset: browser.i18n.getMessage("scaleReset"),
   scaleHint: browser.i18n.getMessage("scaleHint"),
+  scaleHalve: browser.i18n.getMessage("scaleHalve"),
+  scaleDouble: browser.i18n.getMessage("scaleDouble"),
   servingsLabel: browser.i18n.getMessage("servingsLabel"),
   servingsFewer: browser.i18n.getMessage("servingsFewer"),
   servingsMore: browser.i18n.getMessage("servingsMore"),
@@ -50,5 +52,8 @@ browser.runtime.onMessage.addListener((message: unknown) => {
   const selection = document.getSelection();
   if (!selection || selection.rangeCount === 0) return;
   const selected = attachToSelection(document, selection.getRangeAt(0), currentSettings(), messages);
-  if (selected) manual.push(selected);
+  if (!selected) return;
+  manual.push(selected);
+  // The selection has done its job; left in place it would hide the converted lines.
+  selection.removeAllRanges();
 });

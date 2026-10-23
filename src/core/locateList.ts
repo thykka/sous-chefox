@@ -1,3 +1,4 @@
+import { linesOf } from "./pageRewriter";
 import { textNodesOf } from "./visibleText";
 
 /** Share of the structured lines the element must contain. */
@@ -6,6 +7,12 @@ const MIN_RECALL = 0.8;
 const MIN_PRECISION = 0.5;
 /** Share of a line's words that must appear for it to count as present. */
 const MIN_LINE_OVERLAP = 0.7;
+/**
+ * How many lines the element may split into, per structured line. Headings like
+ * "TÄYTE" add a few; a wrapper whose lines each hold several ingredients, or that
+ * splits every amount from its name, isn't the list.
+ */
+const LINE_COUNT_RANGE = [0.5, 1.5];
 
 /**
  * Finds the element whose text best matches the structured recipe lines (its
@@ -29,6 +36,8 @@ export function locateList(doc: Document, lines: string[]): Element | null {
     const matchedTokens = matched.reduce((sum, line) => sum + line.length, 0);
     const precision = Math.min(1, matchedTokens / tokens.length);
     if (recall < MIN_RECALL || precision < MIN_PRECISION) continue;
+    const lineCount = linesOf(candidate).length / wanted.length;
+    if (lineCount < LINE_COUNT_RANGE[0]! || lineCount > LINE_COUNT_RANGE[1]!) continue;
     // Candidates come in document order, so on a tie the deeper element wins.
     const score = recall * precision;
     if (score >= bestScore) {
@@ -40,16 +49,18 @@ export function locateList(doc: Document, lines: string[]): Element | null {
 }
 
 /**
- * Lists and every element that contains one, in document order. A run of paragraphs
- * with nothing else beside them counts as a list, as on sites that write each
- * ingredient as a `<p>`.
+ * Lists, tables and every element that contains one, in document order, leaving out
+ * any the browser reports as hidden (a print-only copy of the list). A run of `<p>` or
+ * `<div>` elements with nothing else beside them counts as a list, as on sites that
+ * write each ingredient as one of those.
  */
 function candidatesOf(doc: Document): Element[] {
   const candidates = new Set<Element>();
-  const paragraphLists = [...(doc.body?.querySelectorAll("p:first-child") ?? [])]
-    .map((p) => p.parentElement!)
-    .filter((parent) => parent.children.length > 1 && [...parent.children].every((child) => child.tagName === "P"));
-  for (const list of [...(doc.body?.querySelectorAll("ul, ol") ?? []), ...paragraphLists]) {
+  const runs = [...(doc.body?.querySelectorAll("p:first-child, div:first-child") ?? [])]
+    .map((first) => first.parentElement!)
+    .filter((parent) => parent.children.length > 1 && [...parent.children].every((child) => child.tagName === parent.firstElementChild!.tagName));
+  for (const list of [...(doc.body?.querySelectorAll("ul, ol, table") ?? []), ...runs]) {
+    if (isHidden(list)) continue;
     for (let el: Element | null = list; el && el !== doc.body; el = el.parentElement) {
       candidates.add(el);
     }
@@ -59,6 +70,11 @@ function candidatesOf(doc: Document): Element[] {
   );
 }
 
+// jsdom has no layout and no checkVisibility, so there every element counts as shown.
+function isHidden(el: Element): boolean {
+  return typeof el.checkVisibility === "function" && !el.checkVisibility();
+}
+
 function tokenize(text: string): string[] {
-  return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  return text.toLowerCase().match(/\p{L}+|\p{N}+/gu) ?? [];
 }

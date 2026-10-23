@@ -1,16 +1,17 @@
 /** What the density table knows about an ingredient name. */
 export type IngredientMatch =
-  | { kind: "dry"; gramsPerMl: number; sticks: boolean }
+  | { kind: "dry"; gramsPerMl: number; sticks: boolean; weighed: boolean }
   | { kind: "liquid" }
   | null;
 
 /**
- * An ingredient with every name it goes by. `dry` entries weigh by volume; `liquid`
+ * An ingredient with every name it goes by. `dry` entries weigh by volume, and the
+ * `weighed` ones are weighed even in Finnish kitchens, where flour and sugar go by dl; `liquid`
  * entries turn "oz" into fluid ounces; `other` entries are look-alikes ("peanut butter",
  * "cream cheese") listed only so they never match a shorter dry or liquid name.
  */
 type Entry =
-  | { kind: "dry"; names: string[]; gramsPerMl: number; packed?: true; sticks?: true; source: string }
+  | { kind: "dry"; names: string[]; gramsPerMl: number; packed?: true; sticks?: true; weighed?: true; source: string }
   | { kind: "liquid"; names: string[] }
   | { kind: "other"; names: string[] };
 
@@ -31,7 +32,7 @@ const ENTRIES: Entry[] = [
   { kind: "dry", names: ["brown sugar", "light brown sugar", "dark brown sugar"], gramsPerMl: perCup(220), packed: true, source: USDA_BROWN_SUGAR },
   { kind: "dry", names: ["powdered sugar", "confectioners sugar", "icing sugar"], gramsPerMl: perCup(113), source: KING_ARTHUR },
   // 113 g per half cup (one stick).
-  { kind: "dry", names: ["butter"], gramsPerMl: perCup(226), sticks: true, source: KING_ARTHUR },
+  { kind: "dry", names: ["butter"], gramsPerMl: perCup(226), sticks: true, weighed: true, source: KING_ARTHUR },
   { kind: "dry", names: ["oats", "rolled oats", "old fashioned oats", "quick oats", "oatmeal"], gramsPerMl: perCup(89), source: KING_ARTHUR },
   // 99 g per half cup, long grain, dry.
   { kind: "dry", names: ["rice", "white rice", "long grain rice"], gramsPerMl: perCup(198), source: KING_ARTHUR },
@@ -39,7 +40,7 @@ const ENTRIES: Entry[] = [
   { kind: "dry", names: ["cocoa", "cocoa powder", "unsweetened cocoa"], gramsPerMl: perCup(84), source: KING_ARTHUR },
   // 28 g per quarter cup.
   { kind: "dry", names: ["cornstarch", "corn starch", "cornflour"], gramsPerMl: perCup(112), source: KING_ARTHUR },
-  { kind: "dry", names: ["chocolate chips", "chocolate chip"], gramsPerMl: perCup(170), source: KING_ARTHUR },
+  { kind: "dry", names: ["chocolate chips", "chocolate chip"], gramsPerMl: perCup(170), weighed: true, source: KING_ARTHUR },
 
   {
     kind: "liquid",
@@ -103,7 +104,7 @@ export function matchIngredient(name: string): IngredientMatch {
   const [entry] = entries;
   if (entry!.kind === "other") return null;
   if (entry!.kind === "liquid") return { kind: "liquid" };
-  return { kind: "dry", gramsPerMl: entry!.gramsPerMl, sticks: entry!.sticks ?? false };
+  return { kind: "dry", gramsPerMl: entry!.gramsPerMl, sticks: entry!.sticks ?? false, weighed: entry!.weighed ?? false };
 }
 
 /** Packed entries replace their loose twin when the name says "packed". */

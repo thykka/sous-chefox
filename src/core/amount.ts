@@ -24,9 +24,10 @@ const UNICODE_FRACTION = `[${Object.keys(UNICODE_FRACTIONS).join("")}]`;
 /** A character that can start an amount: a digit or a Unicode fraction. */
 export const AMOUNT_START = `[\\d${Object.keys(UNICODE_FRACTIONS).join("")}]`;
 const ASCII_FRACTION = String.raw`\d+\s*[/⁄]\s*\d+`;
-const DECIMAL = String.raw`(?:\d+(?:\.\d+)?|\.\d+)`;
+// A decimal comma takes one or two digits ("0,5", "0,25"), so "1,000" never reads as one.
+const DECIMAL = String.raw`(?:\d+(?:\.\d+|,\d{1,2}(?!\d))?|\.\d+)`;
 
-/** One number as written in a recipe: whole, decimal, fraction or mixed number. */
+/** One number as written in a recipe: whole, decimal ("1.5" or "1,5"), fraction or mixed number. */
 export const AMOUNT = [
   String.raw`\d+(?:\s+|\s*-\s*)${ASCII_FRACTION}`,
   String.raw`\d+\s*${UNICODE_FRACTION}`,
@@ -59,7 +60,7 @@ export function parseAmount(text: string): number | null {
   const fractionMatch = text.match(FRACTION);
   if (fractionMatch) return fraction(fractionMatch[1]!, fractionMatch[2]!);
   if (text in UNICODE_FRACTIONS) return UNICODE_FRACTIONS[text]!;
-  const value = Number(text);
+  const value = Number(text.replace(",", "."));
   return Number.isFinite(value) ? value : null;
 }
 

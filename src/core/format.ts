@@ -5,23 +5,59 @@ const UNIT_NAMES: Record<Dimension, { small: string; large: string }> = {
   weight: { small: "g", large: "kg" },
 };
 
-export type FormatOptions = { locale?: string | undefined; whole?: boolean };
+/**
+ * How to write amounts. `kitchen` writes volumes in Finnish kitchen units (dl, rkl, tl)
+ * instead of ml; `decimals` writes their numbers and counts as "0,5" instead of "½".
+ */
+export type NumberStyle = { locale?: string | undefined; kitchen?: boolean | undefined; decimals?: boolean | undefined };
+
+export type FormatOptions = NumberStyle & { whole?: boolean };
 
 /**
  * A metric amount, or a range of two, rounded to what a cook would measure:
- * "240 ml", "1.5 l", "470–710 ml", "950 ml–1.4 l". `whole` amounts are exact
- * figures ("113 g" for a stick of butter), only rounded to whole units.
+ * "240 ml", "1.5 l", "470–710 ml", "950 ml–1.4 l", or with `kitchen` volumes
+ * "2,5 dl", "1 rkl". `whole` amounts are exact figures ("113 g" for a stick of
+ * butter), only rounded to whole units.
  */
 export function formatMetric(values: number[], dimension: Dimension, options: FormatOptions = {}): string {
+  if (dimension === "volume" && options.kitchen) return formatKitchenVolume(values, options);
   const number = new Intl.NumberFormat(options.locale ?? globalThis.navigator?.language, { maximumFractionDigits: 1 });
   const parts = values.map((value) => {
     const { amount, unit } = metricAmount(options.whole ? Math.round(value) : value, dimension, !options.whole);
     return { number: number.format(amount), unit };
   });
-  const [low, high] = parts;
+  return joinRange(parts);
+}
+
+function joinRange([low, high]: { number: string; unit: string }[]): string {
   if (!high || (low!.number === high.number && low!.unit === high.unit)) return `${low!.number} ${low!.unit}`;
   if (low!.unit === high.unit) return `${low!.number}–${high.number} ${high.unit}`;
   return `${low!.number} ${low!.unit}–${high.number} ${high.unit}`;
+}
+
+/**
+ * Finnish kitchen units, each in the steps a cook measures: teaspoons ("tl") in
+ * quarters, tablespoons ("rkl") in halves, decilitres in quarters under 1 dl and halves
+ * above, then litres to one decimal. A tablespoon (14.8 ml) stays "1 rkl".
+ */
+const KITCHEN_UNITS: { below: number; unit: string; size: number; step: number }[] = [
+  { below: 13, unit: "tl", size: 5, step: 0.25 },
+  { below: 45, unit: "rkl", size: 15, step: 0.5 },
+  { below: 100, unit: "dl", size: 100, step: 0.25 },
+  { below: 1000, unit: "dl", size: 100, step: 0.5 },
+  { below: Infinity, unit: "l", size: 1000, step: 0.1 },
+];
+
+function formatKitchenVolume(ml: number[], style: NumberStyle): string {
+  const number = new Intl.NumberFormat(style.locale ?? globalThis.navigator?.language, { maximumFractionDigits: 2 });
+  const parts = ml.map((value) => {
+    const { unit, size, step } = KITCHEN_UNITS.find((u) => value < u.below)!;
+    // Never rounded away to nothing: the smallest is one step.
+    const amount = Math.max(step, roundTo(value / size, step));
+    // Already rounded to its step; tenths of a litre have no common fraction.
+    return { number: style.decimals || unit === "l" ? number.format(amount) : formatCount([amount], style), unit };
+  });
+  return joinRange(parts);
 }
 
 function metricAmount(value: number, dimension: Dimension, round: boolean): { amount: number; unit: string } {
@@ -38,6 +74,13 @@ function roundMetric(value: number, dimension: Dimension): number {
   if (value < 100) return roundTo(value, 5);
   if (value < 1000) return roundTo(value, 10);
   return value;
+}
+
+function decimalStep(value: number): number {
+  if (value < 0.25) return 0.05;
+  if (value < 10) return 0.25;
+  if (value < 100) return 0.5;
+  return 1;
 }
 
 function roundTo(value: number, step: number): number {
@@ -78,10 +121,16 @@ const FRACTIONS: [number, string][] = [
 
 /**
  * A count, or a range of two, to the nearest common fraction: "1½", "¾", "3–4½".
- * A count is never rounded away to nothing; the smallest is "⅛".
+ * A count is never rounded away to nothing; the smallest is "⅛". With `decimals` it's
+ * a decimal instead, in quarters under 10 ("1,5", "0,25"), halves under 100 and whole
+ * numbers above; the smallest is "0,05".
  */
-export function formatCount(values: number[], locale?: string): string {
-  const number = new Intl.NumberFormat(locale ?? globalThis.navigator?.language);
+export function formatCount(values: number[], style: NumberStyle = {}): string {
+  const number = new Intl.NumberFormat(style.locale ?? globalThis.navigator?.language, { maximumFractionDigits: 2 });
+  if (style.decimals) {
+    const parts = values.map((value) => number.format(Math.max(0.05, roundTo(value, decimalStep(value)))));
+    return parts[1] === undefined || parts[1] === parts[0] ? parts[0]! : `${parts[0]}–${parts[1]}`;
+  }
   const parts = values.map((value) => {
     let whole = Math.floor(value);
     const [fraction, glyph] = FRACTIONS.reduce((best, candidate) =>

@@ -27,6 +27,8 @@ describe("rewriteLine parses every way of writing an amount", () => {
     ["mixed unicode fraction", "1½ cups stock", "350 ml stock"],
     ["spaced unicode fraction", "1 ½ cups stock", "350 ml stock"],
     ["decimal", "1.5 cups stock", "350 ml stock"],
+    ["decimal comma", "1,5 cups stock", "350 ml stock"],
+    ["decimal comma, two digits", "0,25 cup honey", "60 ml honey"],
     ["leading-dot decimal", ".5 cup honey", "120 ml honey"],
     ["thirds", "⅓ cup oil", "80 ml oil"],
     ["eighths", "⅞ cup oil", "210 ml oil"],
@@ -145,12 +147,12 @@ describe("rewriteLine leaves lines unchanged", () => {
     ["plain count", "3 large eggs"],
     ["already metric", "250 ml milk"],
     ["unit-like word", "12 cupcake liners"],
-    ["decimal comma", "1,5 cups flour"],
+    ["thousands separator", "1,250 cups flour"],
     ["two decimal points", "1.5.2 cups flour"],
     ["descending range", "3-2 cups stock"],
     ["zero denominator", "1/0 cup sugar"],
     ["improper fraction in a mixed number", "1 3/2 cups flour"],
-    ["unreadable amount after a readable one", "1 cup sugar and 1,5 cups flour"],
+    ["unreadable amount after a readable one", "1 cup sugar and 1,250 cups flour"],
     ["unreadable amount before a readable one", "1/0 tsp salt, 1 cup milk"],
   ])("%s: %s", (_, line) => {
     expect(rewriteLine(line, metric)).toBeNull();
@@ -416,6 +418,84 @@ describe("rewriteLine scales in the original units with metric off", () => {
   });
 
   it("leaves a line it can't read unchanged", () => {
-    expect(rewriteLine("1 cup sugar and 1,5 cups flour", imperial)).toBeNull();
+    expect(rewriteLine("1 cup sugar and 1,250 cups flour", imperial)).toBeNull();
+  });
+});
+
+describe("rewriteLine reads Finnish recipes", () => {
+  const asWritten = (scale: number) => ({ scale, metric: false, locale: "fi-FI", decimals: true });
+
+  it.each([
+    ["decilitres stay decilitres", "1 dl sokeria", 1.5, "1,5 dl sokeria"],
+    ["decimal comma", "0,5 dl öljyä", 2, "1 dl öljyä"],
+    ["no space before the unit", "1dl sokeria", 2, "2dl sokeria"],
+    ["tablespoon", "1 rkl vehnäjauhoja", 2, "2 rkl vehnäjauhoja"],
+    ["teaspoon", "½ tl suolaa", 2, "1 tl suolaa"],
+    ["quarter teaspoon", "0,25 tl mustapippuria", 3, "0,75 tl mustapippuria"],
+    ["teaspoon written out", "1 teelusikka kanelia", 2, "2 teelusikka kanelia"],
+    ["grams into kilograms", "500 g tomaatteja", 2, "1 kg tomaatteja"],
+    ["count", "0,5 kpl chilipalko", 2, "1 kpl chilipalko"],
+    ["package keeps its size", "1 pkt (400 g) rukiista piirakkataikinaa", 2, "2 pkt (400 g) rukiista piirakkataikinaa"],
+    ["can keeps its size", "1 tlk (2½ dl) ruokakermaa", 2, "2 tlk (2½ dl) ruokakermaa"],
+    ["percentage with a space", "1 dl juustoraastetta, esim. 17 % rasvaa", 2, "2 dl juustoraastetta, esim. 17 % rasvaa"],
+  ])("%s: %s × %s → %s", (_, line, scale, expected) => {
+    expect(rewriteLine(line, asWritten(scale))).toBe(expected);
+  });
+
+  it.each([
+    ["teaspoons", "½ tl suolaa", "¼ tl suolaa"],
+    ["decilitres", "1½ dl maitoa", "¾ dl maitoa"],
+  ])("writes fractions when decimals are off: %s", (_, line, expected) => {
+    expect(rewriteLine(line, { ...asWritten(0.5), decimals: false })).toBe(expected);
+  });
+});
+
+describe("rewriteLine writes Finnish kitchen units", () => {
+  const kitchen = { scale: 1, metric: true, locale: "fi-FI", kitchen: true, decimals: true };
+
+  it.each([
+    ["cup in decilitres", "1 cup milk", "2,5 dl milk"],
+    ["tablespoon", "1 tbsp honey", "1 rkl honey"],
+    ["three tablespoons", "3 tbsp oil", "3 rkl oil"],
+    ["teaspoon", "1 tsp vanilla extract", "1 tl vanilla extract"],
+    ["quarter teaspoon", "¼ tsp salt", "0,25 tl salt"],
+    ["never rounded away", "⅛ tsp cayenne", "0,25 tl cayenne"],
+    ["quarter decilitres under 1 dl", "⅓ cup oil", "0,75 dl oil"],
+    ["half decilitres above 1 dl", "1½ cups stock", "3,5 dl stock"],
+    ["litres with one decimal", "6 cups stock", "1,4 l stock"],
+    ["range", "2-3 cups water", "4,5–7 dl water"],
+    ["flour stays by volume", "1 cup flour", "2,5 dl flour"],
+    ["sugar stays by volume", "½ cup sugar", "1 dl sugar"],
+    ["butter is weighed", "½ cup butter", "110 g butter"],
+    ["stick of butter", "1 stick butter", "113 g butter"],
+    ["chocolate chips are weighed", "1 cup chocolate chips", "170 g chocolate chips"],
+    ["weight is unchanged", "8 oz cheese", "230 g cheese"],
+  ])("%s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, kitchen)).toBe(expected);
+  });
+
+  it.each([
+    ["cup", "1 cup milk", "2½ dl milk"],
+    ["quarter teaspoon", "¼ tsp salt", "¼ tl salt"],
+    ["third of a cup", "⅓ cup oil", "¾ dl oil"],
+  ])("with fractions: %s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, { ...kitchen, decimals: false })).toBe(expected);
+  });
+
+  it("scales into the next unit up", () => {
+    expect(rewriteLine("2 tbsp tahini", { ...kitchen, scale: 2 })).toBe("0,5 dl tahini");
+  });
+});
+
+describe("rewriteLine writes counts as decimals", () => {
+  it.each([
+    ["half", "3 large eggs", 0.5, "1.5 large eggs"],
+    ["quarter", "1 lime", 0.25, "0.25 lime"],
+  ])("%s: %s × %s → %s", (_, line, scale, expected) => {
+    expect(rewriteLine(line, { scale, metric: true, locale: "en-US", decimals: true })).toBe(expected);
+  });
+
+  it("keeps imperial amounts as fractions", () => {
+    expect(rewriteLine("1 cup milk", { scale: 1.5, metric: false, locale: "en-US", decimals: true })).toBe("1½ cups milk");
   });
 });

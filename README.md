@@ -25,6 +25,7 @@ Test fixtures in `test/fixtures/` are trimmed snapshots of real recipe pages.
 ```sh
 npm run fixture -- <url> <name>    # fetch and trim a page into test/fixtures/<name>.html
 npm run dump -- <name>             # what attach does to it: list, lines, steps, 2x
+                                   # (dl/rkl/tl and decimals; --ml, --fractions, --imperial)
 ```
 
 Many recipe sites refuse scripted requests: save the page from Firefox and pass it with `--from page.html`. A fixture over 100 KB can be cut down further with `--drop <selector>` or `--cut <selector>:<n>`. The dump is a draft: work out each expectation from the recipe before putting it in a test.

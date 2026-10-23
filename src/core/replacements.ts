@@ -1,9 +1,14 @@
 import { AMOUNT, AMOUNT_BOUNDARY, AMOUNT_START, RANGE_SEPARATOR, parseAmounts } from "./amount";
 import { matchIngredient, type IngredientMatch } from "./densities";
-import { formatCount, formatMetric } from "./format";
-import { FLUID_OUNCE_ML, UNIT, unitOf, type Dimension, type Unit } from "./units";
+import { formatCount, formatMetric, type NumberStyle } from "./format";
+import { FLUID_OUNCE_ML, UNIT, isBaseUnit, unitOf, type Dimension, type Unit } from "./units";
 
-export type LineOptions = { scale: number; metric: boolean; locale?: string };
+/**
+ * How to rewrite a line. `kitchen` writes converted volumes in Finnish kitchen units
+ * (dl, rkl, tl) and leaves flour and sugar by volume; `decimals` writes counts and
+ * metric amounts as "0,5" rather than "½". Imperial amounts are always fractions.
+ */
+export type LineOptions = { scale: number; metric: boolean; locale?: string; kitchen?: boolean; decimals?: boolean };
 
 /**
  * A piece of a line to swap out: `text` replaces `line.slice(start, end)`. `original`
@@ -57,10 +62,10 @@ const LOOSE_QUANTITY = new RegExp(
   "gi",
 );
 
-// A number with no unit: not part of a word, a size ("8-inch", "9x13"), a percentage
-// ("2%", "60 percent") or a temperature.
+// A number with no unit: not part of a word, a size ("8-inch", "9x13", "1½–2cm"), a
+// percentage ("2%", "17 %", "60 percent") or a temperature.
 const COUNT = new RegExp(
-  String.raw`${AMOUNT_BOUNDARY}(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?(?![\w%°º″"'×]|\s*[x×]\s*\d|\s*-\s*\w|\s+per\s?cent(?!\w))`,
+  String.raw`${AMOUNT_BOUNDARY}(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?(?![\w%°º″"'×]|\s+%|${AMOUNT_START}|\s*[x×]\s*\d|\s*[-–—]\s*(?:\w|${AMOUNT_START})|\s+per\s?cent(?!\w))`,
   "gi",
 );
 
@@ -71,9 +76,10 @@ const COUNT_BEFORE_PACKAGE = new RegExp(String.raw`^(?:${AMOUNT})\s+$`);
 const COMPOUND_JOIN = /^\s*(?:\+|plus)\s*$/i;
 
 // What sits between a count and its package size: "2 (14 oz) cans", "1 15-oz can",
-// "1 can (14 oz)". Other words in between ("3 eggs (150 g)") give a total instead.
+// "1 can (14 oz)", "1 pkt (400 g)". Other words in between ("3 eggs (150 g)") give a
+// total instead.
 const PACKAGE_JOIN =
-  /^\s*(?:\(|(?:cans?|tins?|jars?|packages?|pkgs?\.?|packets?|bottles?|box(?:es)?|bags?|cartons?|containers?|blocks?)\s*\()?\s*$/i;
+  /^\s*(?:\(|(?:cans?|tins?|jars?|packages?|pkgs?\.?|packets?|bottles?|box(?:es)?|bags?|cartons?|containers?|blocks?|pkt|paketti[a]?|tlk|tölkki[ä]?|prk|purkki[a]?|pss|pussi[a]?|rs|rasia[a]?)\s*\()?\s*$/i;
 
 export function findReplacements(line: string, options: LineOptions): Replacement[] {
   if (!options.metric) return scaleAsWritten(line, options);
@@ -82,7 +88,7 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
   if (!quantities) return [];
   const counts = scaling ? findCounts(line, quantities) : [];
   if (!counts) return [];
-  const measures = toMetric(quantities, matchIngredient(nameOf(line, quantities)));
+  const measures = toMetric(quantities, matchIngredient(nameOf(line, quantities)), options.kitchen ?? false);
   if (!measures) return [];
   markPackageSizes(line, counts, measures);
   const combined = combineCompounds(line, measures);
@@ -101,7 +107,7 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
         : formatMetric(
             measure.values.map((value) => value * scale),
             measure.dimension,
-            { locale: options.locale, whole: measure.whole && scale === 1 },
+            { ...numberStyle(options), whole: measure.whole && scale === 1 },
           );
     return joined ? { start, end, text, original: line.trim() } : { start, end, text };
   });
@@ -114,8 +120,9 @@ export function hasAmount(line: string): boolean {
 }
 
 /**
- * With metric off, scales the amounts in the units they're written in: imperial ones as
- * common fractions ("1½ cups"), metric ones rounded like a conversion would be.
+ * Scales the amounts in the units they're written in, as with metric off or for a recipe
+ * that's metric already: imperial ones as common fractions ("1½ cups"), decilitres and
+ * spoons in their own unit ("1,5 dl"), and ml, l, g and kg rounded like a conversion.
  */
 function scaleAsWritten(line: string, options: LineOptions): Replacement[] {
   if (options.scale === 1) return [];
@@ -129,7 +136,7 @@ function scaleAsWritten(line: string, options: LineOptions): Replacement[] {
     .filter((quantity) => !packageSizes.has(quantity))
     .map(({ start, end, amountEnd, unitStart, amounts, unit }): Replacement => {
       const values = amounts.map((amount) => amount * options.scale);
-      if (unit.metric) {
+      if (unit.metric && isBaseUnit(unit)) {
         const text = formatMetric(
           values.map((value) => value * unit.size),
           unit.dimension,
@@ -137,7 +144,8 @@ function scaleAsWritten(line: string, options: LineOptions): Replacement[] {
         );
         return { start, end, text };
       }
-      const count = formatCount(values, options.locale);
+      if (unit.metric) return { start, end: amountEnd, text: formatCount(values, numberStyle(options)) };
+      const count = formatCount(values, { locale: options.locale });
       const between = line.slice(amountEnd, unitStart);
       const unitText = line.slice(unitStart, end);
       // A hyphenated unit describes something else and stays singular: "a 30-ounce can".
@@ -153,9 +161,13 @@ function scaleCounts(counts: Count[], options: LineOptions): Replacement[] {
     end,
     text: formatCount(
       values.map((value) => value * options.scale),
-      options.locale,
+      numberStyle(options),
     ),
   }));
+}
+
+function numberStyle(options: LineOptions): NumberStyle {
+  return { locale: options.locale, kitchen: options.kitchen, decimals: options.decimals };
 }
 
 // Unit words that change with the amount; abbreviations ("tbsp", "oz") don't.
@@ -309,10 +321,11 @@ function nameOf(line: string, quantities: Quantity[]): string {
 }
 
 /**
- * Converts each quantity to metric: dry ingredients by weight, "oz" of a liquid by
- * volume. Null when a quantity only makes sense for another ingredient (sticks).
+ * Converts each quantity to metric: dry ingredients by weight (in a Finnish `kitchen`
+ * only the `weighed` ones, like butter), "oz" of a liquid by volume. Null when a quantity
+ * only makes sense for another ingredient (sticks).
  */
-function toMetric(quantities: Quantity[], ingredient: IngredientMatch): Measure[] | null {
+function toMetric(quantities: Quantity[], ingredient: IngredientMatch, kitchen: boolean): Measure[] | null {
   const measures: Measure[] = [];
   for (const { start, end, amounts, unit } of quantities) {
     const push = (dimension: Dimension, size: number, whole = false) =>
@@ -333,7 +346,7 @@ function toMetric(quantities: Quantity[], ingredient: IngredientMatch): Measure[
       push("weight", unit.size, amounts.length === 1 && amounts[0] === 1);
     } else if (unit.ounce && ingredient?.kind === "liquid") {
       push("volume", FLUID_OUNCE_ML);
-    } else if (unit.dimension === "volume" && ingredient?.kind === "dry") {
+    } else if (unit.dimension === "volume" && ingredient?.kind === "dry" && (ingredient.weighed || !kitchen)) {
       push("weight", unit.size * ingredient.gramsPerMl);
     } else {
       push(unit.dimension, unit.size);
