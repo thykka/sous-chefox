@@ -30,5 +30,13 @@
   "servingsMore": {
     "message": "More servings",
     "description": "Tooltip of the button that raises the number of servings by one."
+  },
+  "popupMetric": {
+    "message": "Convert to metric",
+    "description": "Popup switch that turns conversion to metric units on or off."
+  },
+  "popupDisableSite": {
+    "message": "Disable on this site",
+    "description": "Popup switch that turns the extension off on the current tab's site, shown with the site's hostname below it."
   }
 }

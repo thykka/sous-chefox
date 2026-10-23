@@ -11,8 +11,11 @@ export type LineOptions = { scale: number; metric: boolean; locale?: string };
  */
 export type Replacement = { start: number; end: number; text: string; original?: string | null };
 
-/** An amount (or range) as written: one value, or both ends of a range. */
-type Quantity = { start: number; end: number; amounts: number[]; unit: Unit };
+/**
+ * An amount (or range) as written: one value, or both ends of a range. The amount
+ * itself ends at `amountEnd`, and its unit starts at `unitStart`.
+ */
+type Quantity = { start: number; end: number; amountEnd: number; unitStart: number; amounts: number[]; unit: Unit };
 
 /**
  * A quantity in metric. `whole` amounts are exact, so they're shown in whole units;
@@ -43,7 +46,7 @@ type Piece = { start: number; end: number; measure: Measure; siteText?: string; 
 // The unit may be hyphenated on, as in "a 15-ounce can".
 const QUANTITY = new RegExp(
   String.raw`${AMOUNT_BOUNDARY}(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?\s*-?\s*(${UNIT})`,
-  "gi",
+  "dgi",
 );
 
 // Anything number-like before a unit. Each must be part of a readable quantity, or the
@@ -72,8 +75,7 @@ const PACKAGE_JOIN =
   /^\s*(?:\(|(?:cans?|tins?|jars?|packages?|pkgs?\.?|packets?|bottles?|box(?:es)?|bags?|cartons?|containers?|blocks?)\s*\()?\s*$/i;
 
 export function findReplacements(line: string, options: LineOptions): Replacement[] {
-  // Scaling amounts in their original units comes with the settings popup.
-  if (!options.metric) return [];
+  if (!options.metric) return scaleAsWritten(line, options);
   const scaling = options.scale !== 1;
   const quantities = findQuantities(line);
   if (!quantities) return [];
@@ -102,7 +104,42 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
           );
     return joined ? { start, end, text, original: line.trim() } : { start, end, text };
   });
-  const counted = counts.map(({ start, end, values }) => ({
+  return [...measured, ...scaleCounts(counts, options)].sort((a, b) => a.start - b.start);
+}
+
+/**
+ * With metric off, scales the amounts in the units they're written in: imperial ones as
+ * common fractions ("1½ cups"), metric ones rounded like a conversion would be.
+ */
+function scaleAsWritten(line: string, options: LineOptions): Replacement[] {
+  if (options.scale === 1) return [];
+  const quantities = findQuantities(line);
+  if (!quantities) return [];
+  const counts = findCounts(line, quantities);
+  if (!counts) return [];
+  const packageSizes = packageSizesAmong(line, counts, quantities);
+
+  const scaled = quantities
+    .filter((quantity) => !packageSizes.has(quantity))
+    .map(({ start, end, amountEnd, unitStart, amounts, unit }): Replacement => {
+      const values = amounts.map((amount) => amount * options.scale);
+      if (unit.metric) {
+        const text = formatMetric(
+          values.map((value) => value * unit.size),
+          unit.dimension,
+          { locale: options.locale },
+        );
+        return { start, end, text };
+      }
+      const count = formatCount(values, options.locale);
+      const text = count + line.slice(amountEnd, unitStart) + inflect(line.slice(unitStart, end), isPlural(count));
+      return { start, end, text };
+    });
+  return [...scaled, ...scaleCounts(counts, options)].sort((a, b) => a.start - b.start);
+}
+
+function scaleCounts(counts: Count[], options: LineOptions): Replacement[] {
+  return counts.map(({ start, end, values }) => ({
     start,
     end,
     text: formatCount(
@@ -110,7 +147,19 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
       options.locale,
     ),
   }));
-  return [...measured, ...counted].sort((a, b) => a.start - b.start);
+}
+
+// Unit words that change with the amount; abbreviations ("tbsp", "oz") don't.
+const UNIT_WORD = /(cup|spoon|ounce|pound|pint|quart|gallon|stick)s?$/i;
+
+function inflect(unit: string, plural: boolean): string {
+  return unit.replace(UNIT_WORD, (_, word: string) => word + (plural ? "s" : ""));
+}
+
+/** Whether a formatted count takes a plural unit: "1½ cups", "½–1 cup" and "1 cup" don't. */
+function isPlural(count: string): boolean {
+  const high = count.split("–").at(-1)!;
+  return high !== "1" && /\d/.test(high);
 }
 
 /**
@@ -141,10 +190,17 @@ function insideParentheses(line: string, index: number): boolean {
 
 /** A measure right after a count is the size of each package, not an amount to scale. */
 function markPackageSizes(line: string, counts: Count[], measures: Measure[]): void {
+  for (const measure of packageSizesAmong(line, counts, measures)) measure.packageSize = true;
+}
+
+/** The amounts in a line that are package sizes, as in "2 (14 oz) cans". */
+function packageSizesAmong<T extends { start: number }>(line: string, counts: Count[], amounts: T[]): Set<T> {
+  const sizes = new Set<T>();
   for (const count of counts) {
-    const next = measures.find((measure) => measure.start >= count.end);
-    if (next && PACKAGE_JOIN.test(line.slice(count.end, next.start))) next.packageSize = true;
+    const next = amounts.find((amount) => amount.start >= count.end);
+    if (next && PACKAGE_JOIN.test(line.slice(count.end, next.start))) sizes.add(next);
   }
+  return sizes;
 }
 
 // How two amounts for the same thing sit together: "1 cup (120 g)", "200 g / 7 oz".
@@ -273,7 +329,14 @@ function findQuantities(line: string): Quantity[] | null {
   for (const match of line.matchAll(QUANTITY)) {
     const amounts = parseAmounts(match[1]!, match[2]);
     if (!amounts) return null;
-    quantities.push({ start: match.index, end: match.index + match[0].length, amounts, unit: unitOf(match[3]!) });
+    quantities.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      amountEnd: (match.indices![2] ?? match.indices![1]!)[1],
+      unitStart: match.indices![3]![0],
+      amounts,
+      unit: unitOf(match[3]!),
+    });
   }
   const isCovered = (start: number, end: number) =>
     quantities.some(

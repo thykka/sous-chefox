@@ -16,6 +16,11 @@
       "strict_min_version": "142.0"
     }
   },
+  "permissions": ["storage", "activeTab"],
+  "action": {
+    "default_title": "__MSG_extensionName__",
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

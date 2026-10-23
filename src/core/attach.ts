@@ -1,9 +1,9 @@
 import { detectRecipe } from "./detectRecipe";
 import { findInstructionReplacements } from "./instructions";
 import { locateList } from "./locateList";
-import { rewriteList } from "./pageRewriter";
+import { linesOf, rewriteLines } from "./pageRewriter";
 import { findReplacements, isMetricRecipe } from "./replacements";
-import { createScaleControl, ENGLISH, isValidScale, type Messages } from "./scaleControl";
+import { createScaleControl, ENGLISH, isValidScale, type Messages, type ScaleControl } from "./scaleControl";
 import { parseServings } from "./servings";
 
 export type Settings = { metric: boolean; siteDisabled: boolean };
@@ -26,49 +26,106 @@ export function attach(doc: Document, settings: Settings, messages: Messages = E
   if (!list) return null;
   const instructions = locateList(doc, recipe.instructions);
   const steps = instructions && !instructions.contains(list) && !list.contains(instructions) ? instructions : null;
-  const metricRecipe = isMetricRecipe(recipe.ingredients);
+  return createController(
+    {
+      ingredients: linesOf(list),
+      steps: steps ? linesOf(steps) : [],
+      anchor: list,
+      servings: parseServings(recipe.yields),
+      metricRecipe: isMetricRecipe(recipe.ingredients),
+    },
+    settings,
+    messages,
+  );
+}
 
+/**
+ * What a controller rewrites: the ingredient lines, the instruction steps, where the
+ * scaling control goes, the servings at 1× (if known), and whether the ingredients are
+ * metric already.
+ */
+type Target = {
+  ingredients: Element[];
+  steps: Element[];
+  anchor: Element;
+  servings: number | null;
+  metricRecipe: boolean;
+};
+
+const nothing = () => {};
+
+function createController(target: Target, initial: Settings, messages: Messages): RecipeController {
+  let settings = initial;
   // The scale always starts at 1 and is never saved.
   let scale = 1;
+  let control: ScaleControl | null = null;
+  let revertIngredients = nothing;
+  let revertSteps = nothing;
+  let reverted = false;
+
   const renderIngredients = () => {
     // A recipe that's already metric has nothing to convert until it's scaled.
-    if (metricRecipe && scale === 1) return () => {};
+    if (target.metricRecipe && scale === 1) return nothing;
     const options = { scale, metric: settings.metric };
-    return rewriteList(list, (line) => findReplacements(line, options));
+    return rewriteLines(target.ingredients, (line) => findReplacements(line, options));
   };
-  let revertIngredients = renderIngredients();
-  // Instructions are converted once: scaling never changes them.
-  const revertSteps =
-    steps && settings.metric ? rewriteList(steps, (line) => findInstructionReplacements(line)) : () => {};
+  // Instructions are only converted: scaling never changes them.
+  const renderSteps = () =>
+    settings.metric ? rewriteLines(target.steps, (line) => findInstructionReplacements(line)) : nothing;
 
-  let reverted = false;
   /** Re-renders the ingredients at `factor`; false when it isn't a scale to apply. */
   const applyScale = (factor: number): boolean => {
-    if (reverted || !isValidScale(factor)) return false;
+    if (!control || !isValidScale(factor)) return false;
     revertIngredients();
     scale = factor;
     revertIngredients = renderIngredients();
     return true;
   };
   const setScale = (factor: number) => {
-    if (applyScale(factor)) control.show(factor);
+    if (applyScale(factor)) control!.show(factor);
   };
-  const control = createScaleControl(list, {
-    messages,
-    servings: parseServings(recipe.yields),
-    onScale: applyScale,
-    onReset: () => setScale(1),
-  });
 
+  const mount = () => {
+    scale = 1;
+    revertIngredients = renderIngredients();
+    revertSteps = renderSteps();
+    control = createScaleControl(target.anchor, {
+      messages,
+      servings: target.servings,
+      onScale: applyScale,
+      onReset: () => setScale(1),
+    });
+  };
+  const unmount = () => {
+    revertIngredients();
+    revertSteps();
+    revertIngredients = revertSteps = nothing;
+    control?.remove();
+    control = null;
+  };
+
+  if (!settings.siteDisabled) mount();
   return {
     setScale,
-    // Live settings arrive with the settings popup.
-    setSettings() {},
+    setSettings(next) {
+      if (reverted) return;
+      const metricChanged = next.metric !== settings.metric;
+      settings = next;
+      if (next.siteDisabled) {
+        unmount();
+      } else if (!control) {
+        mount();
+      } else if (metricChanged) {
+        // Always from the originals, never from text already rewritten.
+        revertIngredients();
+        revertSteps();
+        revertIngredients = renderIngredients();
+        revertSteps = renderSteps();
+      }
+    },
     revert() {
       reverted = true;
-      revertIngredients();
-      revertSteps();
-      control.remove();
+      unmount();
     },
   };
 }

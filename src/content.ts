@@ -1,5 +1,6 @@
-import { attach } from "./core/attach";
+import { attach, type RecipeController } from "./core/attach";
 import type { Messages } from "./core/scaleControl";
+import { loadSettings, onSettingsChanged, siteSettings } from "./settings";
 
 const messages: Messages = {
   scaleLabel: browser.i18n.getMessage("scaleLabel"),
@@ -10,5 +11,14 @@ const messages: Messages = {
   servingsMore: browser.i18n.getMessage("servingsMore"),
 };
 
-// Settings storage and the popup arrive with the settings ticket; until then use the defaults.
-attach(document, { metric: true, siteDisabled: false }, messages);
+let controller: RecipeController | null = null;
+
+void loadSettings().then((stored) => {
+  controller = attach(document, siteSettings(stored, location.hostname), messages);
+  // A page that started disabled is attached once it's enabled.
+  onSettingsChanged((changed) => {
+    const settings = siteSettings(changed, location.hostname);
+    if (controller) controller.setSettings(settings);
+    else controller = attach(document, settings, messages);
+  });
+});

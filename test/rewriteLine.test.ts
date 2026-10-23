@@ -357,3 +357,57 @@ describe("rewriteLine scales metric amounts", () => {
     expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
   });
 });
+
+describe("rewriteLine scales in the original units with metric off", () => {
+  const imperial = { scale: 2, metric: false, locale: "en-US" };
+
+  it.each([
+    ["1 cup milk", "2 cups milk"],
+    ["⅔ cup sugar", "1⅓ cups sugar"],
+    ["1/2 tsp salt", "1 tsp salt"],
+    ["1 1/2 tablespoons honey", "3 tablespoons honey"],
+    ["¾ teaspoon cinnamon", "1½ teaspoons cinnamon"],
+    ["2-3 cups water", "4–6 cups water"],
+    ["1 cup plus 2 tbsp flour", "2 cups plus 4 tbsp flour"],
+    ["8 oz cheese", "16 oz cheese"],
+    ["1 stick butter", "2 sticks butter"],
+    ["2 (14 oz) cans tomatoes", "4 (14 oz) cans tomatoes"],
+    ["1 15-ounce can beans", "2 15-ounce can beans"],
+    ["3 large eggs", "6 large eggs"],
+    ["1 cup (120 g) flour", "2 cups (240 g) flour"],
+    ["250 ml milk", "500 ml milk"],
+    ["Salt, to taste", null],
+  ])("%s → %s", (line, expected) => {
+    expect(rewriteLine(line, imperial)).toBe(expected);
+  });
+
+  it.each([
+    [0.5, "1 cup milk", "½ cup milk"],
+    [0.5, "2 cups milk", "1 cup milk"],
+    [0.5, "1½ cups stock", "¾ cup stock"],
+    [1.5, "1 cup milk", "1½ cups milk"],
+    [1 / 3, "1 cup milk", "⅓ cup milk"],
+    [1 / 3, "1 tbsp oil", "⅓ tbsp oil"],
+    [0.25, "½ cup cream", "⅛ cup cream"],
+    [0.5, "1 Tablespoon butter", "½ Tablespoon butter"],
+    [1.25, "4 cups flour", "5 cups flour"],
+    [0.5, "1-2 cups water", "½–1 cup water"],
+    [0.75, "1 pound beef", "¾ pound beef"],
+    [1.5, "1 lb beef", "1½ lb beef"],
+  ])("×%s: %s → %s", (scale, line, expected) => {
+    expect(rewriteLine(line, { ...imperial, scale })).toBe(expected);
+  });
+
+  it("never shows a decimal", () => {
+    expect(rewriteLine("1 cup flour", { ...imperial, scale: 0.333 })).toBe("⅓ cup flour");
+    expect(rewriteLine("1 cup flour", { ...imperial, scale: 1.1 })).toBe("1⅛ cups flour");
+  });
+
+  it("leaves the line unchanged at 1×", () => {
+    expect(rewriteLine("1 cup milk", { ...imperial, scale: 1 })).toBeNull();
+  });
+
+  it("leaves a line it can't read unchanged", () => {
+    expect(rewriteLine("1 cup sugar and 1,5 cups flour", imperial)).toBeNull();
+  });
+});

@@ -10,12 +10,12 @@ type Swap = { original: Text; replacement: Node[] };
 export type FindReplacements = (line: string) => Replacement[];
 
 /**
- * Rewrites the pieces `find` picks out in each line of a list (ingredients or
- * instruction steps). Every swapped text node is kept, so `revert` puts back exactly
- * the nodes the page had.
+ * Rewrites the pieces `find` picks out in each line (an ingredient or an instruction
+ * step). Every swapped text node is kept, so `revert` puts back exactly the nodes the
+ * page had.
  */
-export function rewriteList(list: Element, find: FindReplacements): () => void {
-  let swaps = linesOf(list).flatMap((line) => rewriteLineElement(line, find));
+export function rewriteLines(lines: Element[], find: FindReplacements): () => void {
+  let swaps = lines.flatMap((line) => rewriteLineElement(line, find));
   return () => {
     const undone = swaps;
     swaps = [];
@@ -26,7 +26,8 @@ export function rewriteList(list: Element, find: FindReplacements): () => void {
   };
 }
 
-function linesOf(list: Element): Element[] {
+/** The lines of a list: its items, or its children when it has none. */
+export function linesOf(list: Element): Element[] {
   const items = [...list.querySelectorAll("li")];
   return items.length > 0 ? items : [...list.children];
 }
