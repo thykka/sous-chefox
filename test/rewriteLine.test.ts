@@ -10,7 +10,7 @@ describe("rewriteLine", () => {
     ["1 tsp vanilla extract", "5 ml vanilla extract"],
     ["2 teaspoons baking powder", "10 ml baking powder"],
     ["1 tablespoon honey", "15 ml honey"],
-    ["Butter, 2 tbsp", "Butter, 30 ml"],
+    ["Honey, 2 tbsp", "Honey, 30 ml"],
     ["4 cups water - divided", "950 ml water - divided"],
   ])("%s → %s", (line, expected) => {
     expect(rewriteLine(line, metric)).toBe(expected);
@@ -19,15 +19,15 @@ describe("rewriteLine", () => {
 
 describe("rewriteLine parses every way of writing an amount", () => {
   it.each([
-    ["ascii fraction", "1/2 cup sugar", "120 ml sugar"],
-    ["fraction slash", "1⁄2 cup sugar", "120 ml sugar"],
-    ["unicode fraction", "½ cup sugar", "120 ml sugar"],
-    ["mixed number", "1 1/2 cups flour", "350 ml flour"],
-    ["mixed number with hyphen", "1-1/2 cups flour", "350 ml flour"],
-    ["mixed unicode fraction", "1½ cups flour", "350 ml flour"],
-    ["spaced unicode fraction", "1 ½ cups flour", "350 ml flour"],
-    ["decimal", "1.5 cups flour", "350 ml flour"],
-    ["leading-dot decimal", ".5 cup sugar", "120 ml sugar"],
+    ["ascii fraction", "1/2 cup honey", "120 ml honey"],
+    ["fraction slash", "1⁄2 cup honey", "120 ml honey"],
+    ["unicode fraction", "½ cup honey", "120 ml honey"],
+    ["mixed number", "1 1/2 cups stock", "350 ml stock"],
+    ["mixed number with hyphen", "1-1/2 cups stock", "350 ml stock"],
+    ["mixed unicode fraction", "1½ cups stock", "350 ml stock"],
+    ["spaced unicode fraction", "1 ½ cups stock", "350 ml stock"],
+    ["decimal", "1.5 cups stock", "350 ml stock"],
+    ["leading-dot decimal", ".5 cup honey", "120 ml honey"],
     ["thirds", "⅓ cup oil", "80 ml oil"],
     ["eighths", "⅞ cup oil", "210 ml oil"],
   ])("%s: %s → %s", (_, line, expected) => {
@@ -38,7 +38,7 @@ describe("rewriteLine parses every way of writing an amount", () => {
 describe("rewriteLine converts every US customary unit", () => {
   it.each([
     ["teaspoon abbreviation with dot", "1 tsp. salt", "5 ml salt"],
-    ["capitalised tablespoon", "1 Tbsp butter", "15 ml butter"],
+    ["capitalised tablespoon", "1 Tbsp oil", "15 ml oil"],
     ["tbs", "2 tbs oil", "30 ml oil"],
     ["fl oz", "8 fl oz cream", "240 ml cream"],
     ["fl. oz.", "4 fl. oz. cream", "120 ml cream"],
@@ -163,5 +163,87 @@ describe("rewriteLine options", () => {
 
   it("leaves the line unchanged when metric is off", () => {
     expect(rewriteLine("1 cup milk", { ...metric, metric: false })).toBeNull();
+  });
+});
+
+describe("rewriteLine weighs dry ingredients", () => {
+  it.each([
+    ["flour", "1 cup all-purpose flour", "120 g all-purpose flour"],
+    ["plain flour", "2 cups flour", "240 g flour"],
+    ["whole wheat flour", "1 cup whole wheat flour", "110 g whole wheat flour"],
+    ["sugar", "1 cup granulated sugar", "200 g granulated sugar"],
+    ["spoon of sugar", "2 tbsp cane sugar", "25 g cane sugar"],
+    ["powdered sugar", "½ cup powdered sugar", "55 g powdered sugar"],
+    ["butter", "½ cup unsalted butter, softened", "110 g unsalted butter, softened"],
+    ["oats", "1 cup old-fashioned rolled oats", "90 g old-fashioned rolled oats"],
+    ["rice", "1 cup long-grain white rice", "200 g long-grain white rice"],
+    ["cocoa", "⅔ cup cocoa powder (sifted if lumpy)", "55 g cocoa powder (sifted if lumpy)"],
+    ["cornstarch", "2 tbsp cornstarch", "14 g cornstarch"],
+    ["chocolate chips", "½ cup dark chocolate chips", "85 g dark chocolate chips"],
+    ["ingredient named first", "Flour, 1 cup", "Flour, 120 g"],
+    ["preparation words", "1 cup all-purpose flour, sifted", "120 g all-purpose flour, sifted"],
+    ["apostrophe in a name", "1 cup confectioners' sugar, sifted", "110 g confectioners' sugar, sifted"],
+    ["longest name wins", "1 cup brown sugar", "150 g brown sugar"],
+    ["longer flour name wins", "1 cup almond flour", "95 g almond flour"],
+    ["range", "2-3 cups flour", "240–360 g flour"],
+    ["compound", "1 cup plus 2 tbsp flour", "140 g flour"],
+    ["weight stays weight", "8 oz flour", "230 g flour"],
+  ])("%s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, metric)).toBe(expected);
+  });
+
+  it.each([
+    ["loose by default", "1 cup brown sugar", "150 g brown sugar"],
+    ["packed", "1 cup packed brown sugar", "220 g packed brown sugar"],
+    ["packed after the name", "1 cup light brown sugar, firmly packed", "220 g light brown sugar, firmly packed"],
+    ["packed with no packed figure", "1 cup packed flour", "120 g packed flour"],
+  ])("%s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, metric)).toBe(expected);
+  });
+
+  it.each([
+    ["unknown ingredient", "1 cup blueberries", "240 ml blueberries"],
+    ["liquid", "1 cup milk", "240 ml milk"],
+    ["two ingredients", "2 tablespoons avocado oil or melted butter", "30 ml avocado oil or melted butter"],
+    ["look-alike of butter", "½ cup peanut butter", "120 ml peanut butter"],
+    ["look-alike of flour", "1 cup rice flour", "240 ml rice flour"],
+    ["look-alike of sugar", "1 cup coconut sugar", "240 ml coconut sugar"],
+    ["word containing a name", "1 cup buttermilk", "240 ml buttermilk"],
+    ["cooked", "2 cups cooked rice", "470 ml cooked rice"],
+  ])("falls back to ml: %s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, metric)).toBe(expected);
+  });
+});
+
+describe("rewriteLine converts sticks of butter", () => {
+  it.each([
+    ["one stick", "1 stick butter", "113 g butter"],
+    ["two sticks", "2 sticks unsalted butter, softened", "226 g unsalted butter, softened"],
+    ["half a stick", "½ stick butter", "57 g butter"],
+    ["stick plus spoons", "1 stick plus 2 tbsp butter", "140 g butter"],
+  ])("%s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, metric)).toBe(expected);
+  });
+
+  it.each([
+    ["not butter", "1 stick cinnamon"],
+    ["butter look-alike", "1 stick peanut butter"],
+  ])("leaves the line unchanged: %s: %s", (_, line) => {
+    expect(rewriteLine(line, metric)).toBeNull();
+  });
+});
+
+describe("rewriteLine reads oz as weight unless it's fluid", () => {
+  it.each([
+    ["solid", "8 oz cheese", "230 g cheese"],
+    ["fl oz", "8 fl oz milk", "240 ml milk"],
+    ["liquid", "8 oz milk", "240 ml milk"],
+    ["liquid stock", "16 ounces chicken stock", "470 ml chicken stock"],
+    ["liquid juice", "2 oz lime juice", "60 ml lime juice"],
+    ["liquid look-alike", "8 oz cream cheese", "230 g cream cheese"],
+    ["milk chocolate", "4 oz milk chocolate", "110 g milk chocolate"],
+    ["dry ingredient", "4 oz butter", "110 g butter"],
+  ])("%s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, metric)).toBe(expected);
   });
 });

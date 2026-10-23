@@ -5,14 +5,17 @@ const UNIT_NAMES: Record<Dimension, { small: string; large: string }> = {
   weight: { small: "g", large: "kg" },
 };
 
+export type FormatOptions = { locale?: string | undefined; whole?: boolean };
+
 /**
  * A metric amount, or a range of two, rounded to what a cook would measure:
- * "240 ml", "1.5 l", "470–710 ml", "950 ml–1.4 l".
+ * "240 ml", "1.5 l", "470–710 ml", "950 ml–1.4 l". `whole` amounts are exact
+ * figures ("113 g" of butter), only rounded to whole units.
  */
-export function formatMetric(values: number[], dimension: Dimension, locale?: string): string {
-  const number = new Intl.NumberFormat(locale ?? globalThis.navigator?.language, { maximumFractionDigits: 1 });
+export function formatMetric(values: number[], dimension: Dimension, options: FormatOptions = {}): string {
+  const number = new Intl.NumberFormat(options.locale ?? globalThis.navigator?.language, { maximumFractionDigits: 1 });
   const parts = values.map((value) => {
-    const { amount, unit } = metricAmount(value, dimension);
+    const { amount, unit } = metricAmount(options.whole ? Math.round(value) : value, dimension, !options.whole);
     return { number: number.format(amount), unit };
   });
   const [low, high] = parts;
@@ -21,8 +24,8 @@ export function formatMetric(values: number[], dimension: Dimension, locale?: st
   return `${low!.number} ${low!.unit}–${high.number} ${high.unit}`;
 }
 
-function metricAmount(value: number, dimension: Dimension): { amount: number; unit: string } {
-  const rounded = roundMetric(value, dimension);
+function metricAmount(value: number, dimension: Dimension, round: boolean): { amount: number; unit: string } {
+  const rounded = round ? roundMetric(value, dimension) : value;
   const names = UNIT_NAMES[dimension];
   if (rounded >= 1000) return { amount: roundTo(rounded / 1000, 0.1), unit: names.large };
   return { amount: rounded, unit: names.small };
