@@ -4,7 +4,7 @@ A Firefox extension for unit conversions and calculations in recipes.
 
 ## Development
 
-Needs Node 22 (see `.nvmrc`).
+Needs Node 22.23.4 or later (see `.nvmrc`).
 
 ```sh
 npm install

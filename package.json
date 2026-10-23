@@ -20,7 +20,7 @@
     "dump": "node scripts/dump.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.23.4"
   },
   "devDependencies": {
     "@types/firefox-webext-browser": "^143.0.1",
