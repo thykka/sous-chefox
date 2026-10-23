@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Sous-Chefox",
+    "description": "Name of the extension."
+  },
+  "extensionDescription": {
+    "message": "Converts recipe quantities to metric, right on the page.",
+    "description": "Description of the extension shown in the add-ons manager."
+  }
+}
