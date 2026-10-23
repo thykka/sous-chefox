@@ -9,6 +9,7 @@
     "build": "vite build && vite build --mode popup && vite build --mode background",
     "start": "npm run build && web-ext run",
     "lint": "npm run build && web-ext lint",
+    "release": "npm run lint && web-ext build --overwrite-dest",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

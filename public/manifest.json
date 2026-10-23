@@ -16,7 +16,7 @@
       "strict_min_version": "142.0"
     }
   },
-  "permissions": ["storage", "activeTab", "menus"],
+  "permissions": ["storage", "menus"],
   "background": {
     "scripts": ["background.js"]
   },

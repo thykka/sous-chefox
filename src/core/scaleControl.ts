@@ -38,7 +38,8 @@ const DECIMAL = /^\s*(\d+(?:[.,]\d+)?|[.,]\d+)\s*$/;
 const STYLE = `
   :host { all: initial; display: block; margin: 0 0 0.75em; }
   .bar {
-    display: inline-flex; align-items: center; gap: 0.5em; padding: 0.3em 0.6em;
+    display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5em; padding: 0.3em 0.6em;
+    box-sizing: border-box; max-width: 100%;
     font: 14px/1.4 system-ui, sans-serif; color: #222; background: #fff;
     border: 1px solid #ccc; border-radius: 6px;
   }
@@ -49,6 +50,11 @@ const STYLE = `
   input[aria-invalid="true"] { border-color: #c00; background: #fee; outline-color: #c00; }
   button { padding: 0.1em 0.6em; background: #f3f3f3; cursor: pointer; }
   button:disabled { opacity: 0.4; cursor: default; }
+  /* Big enough to tap on a phone. */
+  @media (pointer: coarse) {
+    input, button { min-height: 2.25em; }
+    button { min-width: 2.25em; }
+  }
   @media (prefers-color-scheme: dark) {
     .bar { color: #eee; background: #222; border-color: #555; }
     input { background: #111; }
