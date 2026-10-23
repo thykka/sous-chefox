@@ -1,18 +1,18 @@
 import { textNodesOf } from "./visibleText";
 
-/** Share of the structured ingredients the element must contain. */
+/** Share of the structured lines the element must contain. */
 const MIN_RECALL = 0.8;
-/** Share of the element's words that must belong to those ingredients. */
+/** Share of the element's words that must belong to those lines. */
 const MIN_PRECISION = 0.5;
-/** Share of an ingredient's words that must appear for it to count as present. */
-const MIN_INGREDIENT_OVERLAP = 0.7;
+/** Share of a line's words that must appear for it to count as present. */
+const MIN_LINE_OVERLAP = 0.7;
 
 /**
- * Finds the element whose text best matches the structured ingredient strings,
- * or null when no element matches confidently.
+ * Finds the element whose text best matches the structured recipe lines (its
+ * ingredients, or its instruction steps), or null when no element matches confidently.
  */
-export function locateIngredientList(doc: Document, ingredients: string[]): Element | null {
-  const wanted = ingredients.map(tokenize).filter((tokens) => tokens.length > 0);
+export function locateList(doc: Document, lines: string[]): Element | null {
+  const wanted = lines.map(tokenize).filter((tokens) => tokens.length > 0);
   if (wanted.length === 0) return null;
 
   let best: Element | null = null;
@@ -23,12 +23,10 @@ export function locateIngredientList(doc: Document, ingredients: string[]): Elem
     if (tokens.length === 0) continue;
     const present = new Set(tokens);
     const matched = wanted.filter(
-      (ingredient) =>
-        ingredient.filter((token) => present.has(token)).length / ingredient.length >=
-        MIN_INGREDIENT_OVERLAP,
+      (line) => line.filter((token) => present.has(token)).length / line.length >= MIN_LINE_OVERLAP,
     );
     const recall = matched.length / wanted.length;
-    const matchedTokens = matched.reduce((sum, ingredient) => sum + ingredient.length, 0);
+    const matchedTokens = matched.reduce((sum, line) => sum + line.length, 0);
     const precision = Math.min(1, matchedTokens / tokens.length);
     if (recall < MIN_RECALL || precision < MIN_PRECISION) continue;
     // Candidates come in document order, so on a tie the deeper element wins.

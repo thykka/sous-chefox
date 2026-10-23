@@ -44,3 +44,22 @@ function roundMetric(value: number, dimension: Dimension): number {
 function roundTo(value: number, step: number): number {
   return Math.round(value / step) * step;
 }
+
+/** °C rounded to the nearest 5, or a range of two: "175 °C", "175–190 °C". */
+export function formatTemperature(celsius: number[], locale?: string): string {
+  const number = new Intl.NumberFormat(locale ?? globalThis.navigator?.language);
+  return `${celsius.map((value) => number.format(roundTo(value, 5))).join("–")} °C`;
+}
+
+/**
+ * Lengths in cm, joined by `separator` (pan sides with "×", range ends with "–"):
+ * "23×33 cm", "2.5 cm". When the largest is under 2 cm they're in mm instead ("6 mm").
+ * Centimetres are rounded to the nearest 0.5 under 10 cm, and to whole ones above.
+ */
+export function formatLength(cm: number[], separator: string, locale?: string): string {
+  const number = new Intl.NumberFormat(locale ?? globalThis.navigator?.language, { maximumFractionDigits: 1 });
+  if (Math.max(...cm) < 2) {
+    return `${cm.map((value) => number.format(Math.max(1, Math.round(value * 10)))).join(separator)} mm`;
+  }
+  return `${cm.map((value) => number.format(roundTo(value, value < 10 ? 0.5 : 1))).join(separator)} cm`;
+}

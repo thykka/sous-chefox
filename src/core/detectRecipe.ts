@@ -1,4 +1,4 @@
-export type RecipeData = { ingredients: string[]; yield: string | null };
+export type RecipeData = { ingredients: string[]; instructions: string[]; yield: string | null };
 
 /** Reads schema.org Recipe data (JSON-LD first, then microdata), or null when there is none. */
 export function detectRecipe(doc: Document): RecipeData | null {
@@ -17,6 +17,7 @@ function fromJsonLd(doc: Document): RecipeData | null {
     if (recipe) {
       return {
         ingredients: toStrings(recipe.recipeIngredient ?? recipe.ingredients),
+        instructions: stepsOf(recipe.recipeInstructions),
         yield: toStrings(recipe.recipeYield)[0] ?? null,
       };
     }
@@ -45,13 +46,25 @@ function toStrings(value: unknown): string[] {
     .map((v) => String(v).trim());
 }
 
+/** Instruction text from strings, HowToSteps and HowToSections, in order. */
+function stepsOf(node: unknown): string[] {
+  if (typeof node === "string") return node.trim() ? [node.trim()] : [];
+  if (Array.isArray(node)) return node.flatMap(stepsOf);
+  if (typeof node !== "object" || node === null) return [];
+  const record = node as Record<string, unknown>;
+  if (record.itemListElement !== undefined) return stepsOf(record.itemListElement);
+  return stepsOf(record.text);
+}
+
 function fromMicrodata(doc: Document): RecipeData | null {
   const scope = doc.querySelector('[itemscope][itemtype*="schema.org/Recipe" i]');
   if (!scope) return null;
   const ingredients = [...scope.querySelectorAll('[itemprop~="recipeIngredient"], [itemprop~="ingredients"]')];
+  const instructions = [...scope.querySelectorAll('[itemprop~="recipeInstructions"]')];
   const yieldEl = scope.querySelector('[itemprop~="recipeYield"]');
   return {
     ingredients: ingredients.map((el) => itempropValue(el)),
+    instructions: instructions.map((el) => itempropValue(el)),
     yield: yieldEl ? itempropValue(yieldEl) : null,
   };
 }

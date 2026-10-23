@@ -1,7 +1,8 @@
 import { detectRecipe } from "./detectRecipe";
-import { locateIngredientList } from "./locateIngredientList";
+import { findInstructionReplacements } from "./instructions";
+import { locateList } from "./locateList";
 import { rewriteList } from "./pageRewriter";
-import { isMetricRecipe } from "./replacements";
+import { findReplacements, isMetricRecipe } from "./replacements";
 
 export type Settings = { metric: boolean; siteDisabled: boolean };
 
@@ -19,15 +20,25 @@ export function attach(doc: Document, settings: Settings): RecipeController | nu
   if (settings.siteDisabled) return null;
   const recipe = detectRecipe(doc);
   if (!recipe) return null;
-  const list = locateIngredientList(doc, recipe.ingredients);
+  const list = locateList(doc, recipe.ingredients);
   if (!list) return null;
+  const instructions = locateList(doc, recipe.instructions);
+  const steps = instructions && !instructions.contains(list) && !list.contains(instructions) ? instructions : null;
 
+  const options = { scale: 1, metric: settings.metric };
   // A recipe that's already metric has nothing to convert until it's scaled.
-  const revert = isMetricRecipe(recipe.ingredients) ? () => {} : rewriteList(list, { scale: 1, metric: settings.metric });
+  const revertIngredients = isMetricRecipe(recipe.ingredients)
+    ? () => {}
+    : rewriteList(list, (line) => findReplacements(line, options));
+  const revertSteps =
+    steps && settings.metric ? rewriteList(steps, (line) => findInstructionReplacements(line)) : () => {};
   return {
     // Scaling and live settings arrive with the scaling control and the settings popup.
     setScale() {},
     setSettings() {},
-    revert,
+    revert() {
+      revertIngredients();
+      revertSteps();
+    },
   };
 }

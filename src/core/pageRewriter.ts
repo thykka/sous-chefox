@@ -1,4 +1,4 @@
-import { findReplacements, type LineOptions } from "./replacements";
+import type { Replacement } from "./replacements";
 import { textNodesOf } from "./visibleText";
 
 const MARKER_CLASS = "sous-chefox-converted";
@@ -6,12 +6,16 @@ const MARKER_CLASS = "sous-chefox-converted";
 /** How to put one rewritten text node back: the original node and what replaced it. */
 type Swap = { original: Text; replacement: Node[] };
 
+/** Finds what to rewrite in the text of one line. */
+export type FindReplacements = (line: string) => Replacement[];
+
 /**
- * Rewrites quantities in each line of an ingredient list. Every swapped text node is
- * kept, so `revert` puts back exactly the nodes the page had.
+ * Rewrites the pieces `find` picks out in each line of a list (ingredients or
+ * instruction steps). Every swapped text node is kept, so `revert` puts back exactly
+ * the nodes the page had.
  */
-export function rewriteList(list: Element, options: LineOptions): () => void {
-  let swaps = linesOf(list).flatMap((line) => rewriteLineElement(line, options));
+export function rewriteList(list: Element, find: FindReplacements): () => void {
+  let swaps = linesOf(list).flatMap((line) => rewriteLineElement(line, find));
   return () => {
     const undone = swaps;
     swaps = [];
@@ -27,10 +31,10 @@ function linesOf(list: Element): Element[] {
   return items.length > 0 ? items : [...list.children];
 }
 
-function rewriteLineElement(line: Element, options: LineOptions): Swap[] {
+function rewriteLineElement(line: Element, find: FindReplacements): Swap[] {
   const nodes = textNodesOf(line);
   const text = nodes.map((node) => node.data).join("");
-  const replacements = findReplacements(text, options);
+  const replacements = find(text);
   if (replacements.length === 0) return [];
 
   const doc = line.ownerDocument;

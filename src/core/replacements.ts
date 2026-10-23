@@ -1,4 +1,4 @@
-import { AMOUNT, AMOUNT_START, parseAmount } from "./amount";
+import { AMOUNT, AMOUNT_BOUNDARY, AMOUNT_START, RANGE_SEPARATOR, parseAmounts } from "./amount";
 import { matchIngredient, type IngredientMatch } from "./densities";
 import { formatMetric } from "./format";
 import { FLUID_OUNCE_ML, UNIT, unitOf, type Dimension, type Unit } from "./units";
@@ -26,12 +26,8 @@ type Measure = { start: number; end: number; values: number[]; dimension: Dimens
  */
 type Piece = { start: number; end: number; measure: Measure; siteText?: string };
 
-const RANGE_SEPARATOR = String.raw`\s*[-–—]\s*|\s+(?:to|or)\s+`;
-
-// An amount starts where no other number, word or fraction runs into it
-// ("7 oz" in "200g/7oz" starts an amount; "2 cups" in "1/2 cups" doesn't).
 const QUANTITY = new RegExp(
-  String.raw`(?<![\w.,⁄])(?<!\d\s*[/⁄]\s*)(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?\s*(${UNIT})`,
+  String.raw`${AMOUNT_BOUNDARY}(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?\s*(${UNIT})`,
   "gi",
 );
 
@@ -166,15 +162,6 @@ function findQuantities(line: string): Quantity[] | null {
     if (!isCovered(match.index, match.index + match[0].length)) return null;
   }
   return quantities;
-}
-
-/** One amount, or both ends of a range, or null when any of it can't be read. */
-function parseAmounts(low: string, high: string | undefined): number[] | null {
-  const from = parseAmount(low);
-  if (from === null) return null;
-  if (high === undefined) return [from];
-  const to = parseAmount(high);
-  return to === null || to <= from ? null : [from, to];
 }
 
 /** Merges measures joined by "plus" into one, when they measure the same thing. */

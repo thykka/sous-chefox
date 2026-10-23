@@ -37,6 +37,15 @@ export const AMOUNT = [
   .map((pattern) => `(?:${pattern})`)
   .join("|");
 
+/**
+ * Where an amount can start: no other number, word or fraction runs into it
+ * ("7 oz" in "200g/7oz" starts an amount; "2 cups" in "1/2 cups" doesn't).
+ */
+export const AMOUNT_BOUNDARY = String.raw`(?<![\w.,⁄])(?<!\d\s*[/⁄]\s*)`;
+
+/** What joins the two ends of a range: "2-3", "2 – 3", "2 to 3", "1 or 2". */
+export const RANGE_SEPARATOR = String.raw`\s*[-–—]\s*|\s+(?:to|or)\s+`;
+
 const MIXED = new RegExp(String.raw`^(\d+)(?:\s+|\s*-\s*)(\d+)\s*[/⁄]\s*(\d+)$`);
 const MIXED_UNICODE = new RegExp(String.raw`^(\d+)\s*(${UNICODE_FRACTION})$`);
 const FRACTION = new RegExp(String.raw`^(\d+)\s*[/⁄]\s*(\d+)$`);
@@ -52,6 +61,15 @@ export function parseAmount(text: string): number | null {
   if (text in UNICODE_FRACTIONS) return UNICODE_FRACTIONS[text]!;
   const value = Number(text);
   return Number.isFinite(value) ? value : null;
+}
+
+/** One amount, or both ends of a range, or null when any of it can't be read. */
+export function parseAmounts(low: string, high: string | undefined): number[] | null {
+  const from = parseAmount(low);
+  if (from === null) return null;
+  if (high === undefined) return [from];
+  const to = parseAmount(high);
+  return to === null || to <= from ? null : [from, to];
 }
 
 function fraction(numerator: string, denominator: string): number | null {
