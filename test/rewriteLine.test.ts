@@ -373,6 +373,7 @@ describe("rewriteLine scales in the original units with metric off", () => {
     ["1 stick butter", "2 sticks butter"],
     ["2 (14 oz) cans tomatoes", "4 (14 oz) cans tomatoes"],
     ["1 15-ounce can beans", "2 15-ounce can beans"],
+    ["a 15-ounce can beans", "a 30-ounce can beans"],
     ["3 large eggs", "6 large eggs"],
     ["1 cup (120 g) flour", "2 cups (240 g) flour"],
     ["250 ml milk", "500 ml milk"],

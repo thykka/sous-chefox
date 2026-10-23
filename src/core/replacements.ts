@@ -137,7 +137,10 @@ function scaleAsWritten(line: string, options: LineOptions): Replacement[] {
         return { start, end, text };
       }
       const count = formatCount(values, options.locale);
-      const text = count + line.slice(amountEnd, unitStart) + inflect(line.slice(unitStart, end), isPlural(count));
+      const between = line.slice(amountEnd, unitStart);
+      const unitText = line.slice(unitStart, end);
+      // A hyphenated unit describes something else and stays singular: "a 30-ounce can".
+      const text = count + between + (between.includes("-") ? unitText : inflect(unitText, isPlural(count)));
       return { start, end, text };
     });
   return [...scaled, ...scaleCounts(counts, options)].sort((a, b) => a.start - b.start);
@@ -161,7 +164,7 @@ function inflect(unit: string, plural: boolean): string {
   return unit.replace(UNIT_WORD, (_, word: string) => word + (plural ? "s" : ""));
 }
 
-/** Whether a formatted count takes a plural unit: "1½ cups", "½–1 cup" and "1 cup" don't. */
+/** Whether a formatted count takes a plural unit: "1½ cups" does; "1 cup", "½ cup" and "½–1 cup" don't. */
 function isPlural(count: string): boolean {
   const high = count.split("–").at(-1)!;
   return high !== "1" && /\d/.test(high);

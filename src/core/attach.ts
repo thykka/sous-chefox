@@ -25,7 +25,7 @@ export function attach(doc: Document, settings: Settings, messages: Messages = E
   const recipe = detectRecipe(doc);
   if (!recipe) return null;
   const list = locateList(doc, recipe.ingredients);
-  if (!list) return null;
+  if (!list || linesOf(list).some(isManaged)) return null;
   const instructions = locateList(doc, recipe.instructions);
   const steps = instructions && !instructions.contains(list) && !list.contains(instructions) ? instructions : null;
   return createController(
@@ -57,9 +57,13 @@ export function attachToSelection(
   if (lines.some(isManaged)) return null;
   const texts = lines.flatMap(textLinesOf).map(lineText);
   if (lines.length === 0 || !texts.some(hasAmount)) return null;
-  // Lines in one list get the control above the list, as for `attach`.
+  // A list selected from its first item gets the control above the list, as for `attach`.
   const list = lines[0]!.closest("ul, ol");
-  const anchor = list && lines.every((line) => line.tagName === "LI" && list.contains(line)) ? list : lines[0]!;
+  const fromFirstItem =
+    list !== null &&
+    list.querySelector("li") === lines[0] &&
+    lines.every((line) => line.tagName === "LI" && list.contains(line));
+  const anchor = fromFirstItem ? list : lines[0]!;
   return createController(
     { ingredients: lines, steps: [], anchor, servings: null, metricRecipe: isMetricRecipe(texts) },
     settings,
@@ -99,7 +103,8 @@ function createController(target: Target, initial: Settings, messages: Messages)
   let revertIngredients = nothing;
   let revertSteps = nothing;
   let reverted = false;
-  for (const line of target.ingredients) managed.add(line);
+  const lines = [...target.ingredients, ...target.steps];
+  for (const line of lines) managed.add(line);
 
   const renderIngredients = () => {
     // A recipe that's already metric has nothing to convert until it's scaled.
@@ -123,10 +128,20 @@ function createController(target: Target, initial: Settings, messages: Messages)
     if (applyScale(factor)) control!.show(factor);
   };
 
-  const mount = () => {
-    scale = 1;
+  // Always from the originals, never from text already rewritten.
+  const render = () => {
     revertIngredients = renderIngredients();
     revertSteps = renderSteps();
+  };
+  const unrender = () => {
+    revertIngredients();
+    revertSteps();
+    revertIngredients = revertSteps = nothing;
+  };
+
+  const mount = () => {
+    scale = 1;
+    render();
     control = createScaleControl(target.anchor, {
       messages,
       servings: target.servings,
@@ -135,9 +150,7 @@ function createController(target: Target, initial: Settings, messages: Messages)
     });
   };
   const unmount = () => {
-    revertIngredients();
-    revertSteps();
-    revertIngredients = revertSteps = nothing;
+    unrender();
     control?.remove();
     control = null;
   };
@@ -154,18 +167,15 @@ function createController(target: Target, initial: Settings, messages: Messages)
       } else if (!control) {
         mount();
       } else if (metricChanged) {
-        // Always from the originals, never from text already rewritten.
-        revertIngredients();
-        revertSteps();
-        revertIngredients = renderIngredients();
-        revertSteps = renderSteps();
+        unrender();
+        render();
       }
     },
     revert() {
       if (reverted) return;
       reverted = true;
       unmount();
-      for (const line of target.ingredients) managed.delete(line);
+      for (const line of lines) managed.delete(line);
     },
   };
 }
