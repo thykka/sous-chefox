@@ -13,9 +13,3 @@ export function textNodesOf(root: Node): Text[] {
   while (walker.nextNode()) nodes.push(walker.currentNode as Text);
   return nodes;
 }
-
-export function visibleText(root: Node): string {
-  return textNodesOf(root)
-    .map((node) => node.data)
-    .join("");
-}

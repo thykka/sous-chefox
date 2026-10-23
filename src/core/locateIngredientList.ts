@@ -1,4 +1,4 @@
-import { visibleText } from "./visibleText";
+import { textNodesOf } from "./visibleText";
 
 /** Share of the structured ingredients the element must contain. */
 const MIN_RECALL = 0.8;
@@ -18,7 +18,8 @@ export function locateIngredientList(doc: Document, ingredients: string[]): Elem
   let best: Element | null = null;
   let bestScore = 0;
   for (const candidate of candidatesOf(doc)) {
-    const tokens = tokenize(visibleText(candidate));
+    // Each text node on its own: list items often run together with no space between.
+    const tokens = textNodesOf(candidate).flatMap((node) => tokenize(node.data));
     if (tokens.length === 0) continue;
     const present = new Set(tokens);
     const matched = wanted.filter(

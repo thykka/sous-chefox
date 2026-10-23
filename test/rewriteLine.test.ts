@@ -247,3 +247,40 @@ describe("rewriteLine reads oz as weight unless it's fluid", () => {
     expect(rewriteLine(line, metric)).toBe(expected);
   });
 });
+
+describe("rewriteLine prefers a metric amount already in the line", () => {
+  it.each([
+    ["metric after imperial", "1 cup (120 g) flour", "120 g flour"],
+    ["imperial after metric", "200 g (7 oz) dark chocolate", "200 g dark chocolate"],
+    ["written as the site wrote it", "1 cup (240ml) milk", "240ml milk"],
+    ["brackets", "1 cup [240 ml] milk", "240 ml milk"],
+    ["slash", "1 cup / 240 ml milk", "240 ml milk"],
+    ["slash without spaces", "200g/7oz chocolate", "200g chocolate"],
+    ["ingredient first", "Flour, 1 cup (120 g)", "Flour, 120 g"],
+    ["ranges", "2-3 cups (480-720 ml) stock", "480-720 ml stock"],
+    ["compound imperial", "1 cup plus 2 tbsp (270 ml) milk", "270 ml milk"],
+    ["kilograms", "2 lb (1 kg) potatoes", "1 kg potatoes"],
+    ["litres", "1 quart (1 litre) stock", "1 litre stock"],
+    ["imperial amount without a metric twin still converts", "1 cup (120 g) flour plus 2 tbsp milk", "120 g flour plus 30 ml milk"],
+  ])("%s: %s → %s", (_, line, expected) => {
+    expect(rewriteLine(line, metric)).toBe(expected);
+  });
+
+  it("scales the site's metric amount", () => {
+    expect(rewriteLine("1 cup (120 g) flour", { ...metric, scale: 2 })).toBe("240 g flour");
+  });
+
+  it.each([
+    ["grams", "100g plain flour"],
+    ["spaced grams", "250 g butter"],
+    ["millilitres", "300ml milk"],
+    ["litres", "1.5 l water"],
+    ["decilitres", "2 dl cream"],
+    ["kilograms", "1 kg potatoes"],
+    ["range", "100-150 g sugar"],
+    ["words", "500 grams flour"],
+    ["metric amount apart from the imperial one", "1 cup flour (about 120 g)"],
+  ])("leaves the line unchanged: %s: %s", (_, line) => {
+    expect(rewriteLine(line, metric)).toBeNull();
+  });
+});

@@ -5,20 +5,33 @@ import { FLUID_OUNCE_ML, UNIT, unitOf, type Dimension, type Unit } from "./units
 
 export type LineOptions = { scale: number; metric: boolean; locale?: string };
 
-/** A piece of a line to swap out: `text` replaces `line.slice(start, end)`. */
-export type Replacement = { start: number; end: number; text: string };
+/**
+ * A piece of a line to swap out: `text` replaces `line.slice(start, end)`. `original`
+ * is what the tooltip shows, when it's more than the piece itself.
+ */
+export type Replacement = { start: number; end: number; text: string; original?: string };
 
 /** An amount (or range) as written: one value, or both ends of a range. */
 type Quantity = { start: number; end: number; amounts: number[]; unit: Unit };
 
-/** A quantity in metric. `whole` amounts are exact, so they're shown in whole units. */
-type Measure = { start: number; end: number; values: number[]; dimension: Dimension; whole: boolean };
+/**
+ * A quantity in metric. `whole` amounts are exact, so they're shown in whole units;
+ * `metric` ones were written in metric to begin with.
+ */
+type Measure = { start: number; end: number; values: number[]; dimension: Dimension; whole: boolean; metric: boolean };
+
+/**
+ * A measure to write into the line over `start`–`end`. A metric amount the site gave
+ * alongside imperial carries its own text, which is shown as written.
+ */
+type Piece = { start: number; end: number; measure: Measure; siteText?: string };
 
 const RANGE_SEPARATOR = String.raw`\s*[-–—]\s*|\s+(?:to|or)\s+`;
 
-// An amount starts where no other number, word or fraction runs into it.
+// An amount starts where no other number, word or fraction runs into it
+// ("7 oz" in "200g/7oz" starts an amount; "2 cups" in "1/2 cups" doesn't).
 const QUANTITY = new RegExp(
-  String.raw`(?<![\w.,/⁄])(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?\s*(${UNIT})`,
+  String.raw`(?<![\w.,⁄])(?<!\d\s*[/⁄]\s*)(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?\s*(${UNIT})`,
   "gi",
 );
 
@@ -39,15 +52,62 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
   if (!quantities) return [];
   const measures = toMetric(quantities, matchIngredient(nameOf(line, quantities)));
   if (!measures) return [];
-  return combineCompounds(line, measures).map(({ start, end, values, dimension, whole }) => ({
-    start,
-    end,
-    text: formatMetric(
-      values.map((value) => value * options.scale),
-      dimension,
-      { locale: options.locale, whole },
-    ),
-  }));
+  const combined = combineCompounds(line, measures);
+  if (combined.every((measure) => measure.metric)) return [];
+  const pieces = pairWithSiteMetric(line, combined);
+  if (!pieces) return [];
+  return pieces.map(({ start, end, measure, siteText }) => {
+    const text =
+      siteText !== undefined && options.scale === 1
+        ? siteText
+        : formatMetric(
+            measure.values.map((value) => value * options.scale),
+            measure.dimension,
+            { locale: options.locale, whole: measure.whole },
+          );
+    return siteText === undefined ? { start, end, text } : { start, end, text, original: line.trim() };
+  });
+}
+
+// How a metric amount sits next to an imperial one: "1 cup (120 g)", "200 g / 7 oz".
+const PAIR_OPEN = /^\s*[([]\s*$/;
+const PAIR_CLOSE = /^\s*[)\]]/;
+const PAIR_SLASH = /^\s*\/\s*$/;
+
+/**
+ * Joins each imperial measure with a metric amount written right next to it, either
+ * order, so the site's own figure replaces both. Null when the line has a metric
+ * amount that isn't paired like that: it already gives metric, so it's left alone.
+ */
+function pairWithSiteMetric(line: string, measures: Measure[]): Piece[] | null {
+  const pieces: Piece[] = [];
+  for (let i = 0; i < measures.length; i++) {
+    const first = measures[i]!;
+    const second = measures[i + 1];
+    if (second && first.metric !== second.metric) {
+      const between = line.slice(first.end, second.start);
+      const close = line.slice(second.end).match(PAIR_CLOSE);
+      const end = PAIR_SLASH.test(between) ? second.end : PAIR_OPEN.test(between) && close ? second.end + close[0].length : null;
+      if (end !== null) {
+        const metric = first.metric ? first : second;
+        pieces.push({ start: first.start, end, measure: metric, siteText: line.slice(metric.start, metric.end) });
+        i++;
+        continue;
+      }
+    }
+    if (first.metric) return null;
+    pieces.push({ start: first.start, end: first.end, measure: first });
+  }
+  return pieces;
+}
+
+/**
+ * Whether a recipe's ingredient lines are already metric: they give metric amounts
+ * and no US customary ones besides spoons, which metric cooks use as they are.
+ */
+export function isMetricRecipe(lines: string[]): boolean {
+  const units = lines.flatMap((line) => findQuantities(line) ?? []).map((quantity) => quantity.unit);
+  return units.some((unit) => unit.metric) && units.every((unit) => unit.metric || unit.spoon);
 }
 
 /** The line without its quantities: what's left names the ingredient. */
@@ -69,8 +129,17 @@ function toMetric(quantities: Quantity[], ingredient: IngredientMatch): Measure[
   const measures: Measure[] = [];
   for (const { start, end, amounts, unit } of quantities) {
     const measure = (dimension: Dimension, size: number, whole = false) =>
-      measures.push({ start, end, values: amounts.map((amount) => amount * size), dimension, whole });
-    if (unit.stick) {
+      measures.push({
+        start,
+        end,
+        values: amounts.map((amount) => amount * size),
+        dimension,
+        whole,
+        metric: unit.metric ?? false,
+      });
+    if (unit.metric) {
+      measure(unit.dimension, unit.size);
+    } else if (unit.stick) {
       if (ingredient?.kind !== "dry" || !ingredient.sticks) return null;
       measure("weight", unit.size, true);
     } else if (unit.ounce && ingredient?.kind === "liquid") {
@@ -123,6 +192,7 @@ function combineCompounds(line: string, measures: Measure[]): Measure[] {
         end: measure.end,
         values: sum(previous.values, measure.values),
         whole: previous.whole && measure.whole,
+        metric: previous.metric && measure.metric,
       };
     } else {
       combined.push(measure);
