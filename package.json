@@ -5,13 +5,19 @@
   "type": "module",
   "description": "A Firefox extension for unit conversions and calculations in recipes.",
   "scripts": {
-    "prebuild": "node -e \"if (+process.versions.node.split('.')[0] < 22) { console.error('Node 22+ required (see .nvmrc): run nvm use'); process.exit(1) }\"",
+    "prebuild": "node scripts/check-node.mjs",
     "build": "vite build && vite build --mode popup && vite build --mode background",
     "start": "npm run build && web-ext run",
     "lint": "npm run build && web-ext lint",
     "release": "npm run lint && web-ext build --overwrite-dest",
+    "pretypecheck": "node scripts/check-node.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "pretest": "node scripts/check-node.mjs",
+    "test": "vitest run",
+    "prefixture": "node scripts/check-node.mjs",
+    "fixture": "NODE_USE_ENV_PROXY=1 node --disable-warning=UNDICI-EHPA scripts/fixture.mjs",
+    "predump": "node scripts/check-node.mjs",
+    "dump": "node scripts/dump.mjs"
   },
   "engines": {
     "node": ">=22"

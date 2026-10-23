@@ -14,7 +14,18 @@ npm start          # build, then launch Firefox with the extension via web-ext
 npm run lint       # build, then web-ext lint
 ```
 
-The extension is built into `dist/`. Test fixtures in `test/fixtures/` are trimmed snapshots of real recipe pages.
+The extension is built into `dist/`.
+
+## Fixtures
+
+Test fixtures in `test/fixtures/` are trimmed snapshots of real recipe pages.
+
+```sh
+npm run fixture -- <url> <name>    # fetch and trim a page into test/fixtures/<name>.html
+npm run dump -- <name>             # what attach does to it: list, lines, steps, 2x
+```
+
+Many recipe sites refuse scripted requests: save the page from Firefox and pass it with `--from page.html`. A fixture over 100 KB can be cut down further with `--drop <selector>` or `--cut <selector>:<n>`. The dump is a draft: work out each expectation from the recipe before putting it in a test.
 
 ## Release
 
