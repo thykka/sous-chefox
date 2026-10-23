@@ -18,5 +18,17 @@
   "scaleHint": {
     "message": "A number from 0.1 to 20",
     "description": "Tooltip of the scale factor input, describing what it accepts."
+  },
+  "servingsLabel": {
+    "message": "Servings",
+    "description": "Label of the servings stepper above a recipe's ingredient list."
+  },
+  "servingsFewer": {
+    "message": "Fewer servings",
+    "description": "Tooltip of the button that lowers the number of servings by one."
+  },
+  "servingsMore": {
+    "message": "More servings",
+    "description": "Tooltip of the button that raises the number of servings by one."
   }
 }

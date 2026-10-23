@@ -1,4 +1,4 @@
-export type RecipeData = { ingredients: string[]; instructions: string[]; yield: string | null };
+export type RecipeData = { ingredients: string[]; instructions: string[]; yields: string[] };
 
 /** Reads schema.org Recipe data (JSON-LD first, then microdata), or null when there is none. */
 export function detectRecipe(doc: Document): RecipeData | null {
@@ -18,7 +18,7 @@ function fromJsonLd(doc: Document): RecipeData | null {
       return {
         ingredients: toStrings(recipe.recipeIngredient ?? recipe.ingredients),
         instructions: stepsOf(recipe.recipeInstructions),
-        yield: toStrings(recipe.recipeYield)[0] ?? null,
+        yields: toStrings(recipe.recipeYield),
       };
     }
   }
@@ -61,11 +61,11 @@ function fromMicrodata(doc: Document): RecipeData | null {
   if (!scope) return null;
   const ingredients = [...scope.querySelectorAll('[itemprop~="recipeIngredient"], [itemprop~="ingredients"]')];
   const instructions = [...scope.querySelectorAll('[itemprop~="recipeInstructions"]')];
-  const yieldEl = scope.querySelector('[itemprop~="recipeYield"]');
+  const yields = [...scope.querySelectorAll('[itemprop~="recipeYield"]')];
   return {
     ingredients: ingredients.map((el) => itempropValue(el)),
     instructions: instructions.map((el) => itempropValue(el)),
-    yield: yieldEl ? itempropValue(yieldEl) : null,
+    yields: yields.map((el) => itempropValue(el)),
   };
 }
 

@@ -4,6 +4,7 @@ import { locateList } from "./locateList";
 import { rewriteList } from "./pageRewriter";
 import { findReplacements, isMetricRecipe } from "./replacements";
 import { createScaleControl, ENGLISH, isValidScale, type Messages } from "./scaleControl";
+import { parseServings } from "./servings";
 
 export type Settings = { metric: boolean; siteDisabled: boolean };
 
@@ -52,7 +53,12 @@ export function attach(doc: Document, settings: Settings, messages: Messages = E
   const setScale = (factor: number) => {
     if (applyScale(factor)) control.show(factor);
   };
-  const control = createScaleControl(list, messages, applyScale, () => setScale(1));
+  const control = createScaleControl(list, {
+    messages,
+    servings: parseServings(recipe.yields),
+    onScale: applyScale,
+    onReset: () => setScale(1),
+  });
 
   return {
     setScale,
