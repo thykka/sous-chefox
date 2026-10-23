@@ -86,7 +86,7 @@ function temperatureReplacements(text: string, locale?: string): Replacement[] {
  */
 function lengthReplacements(text: string, locale?: string): Replacement[] {
   const replacements: Replacement[] = [];
-  const metric = [...text.matchAll(METRIC_LENGTH)].map((match) => ({ start: match.index, end: match.index + match[0].length }));
+  const siteMetric = [...text.matchAll(METRIC_LENGTH)].map((match) => ({ start: match.index, end: match.index + match[0].length }));
   for (const match of text.matchAll(LENGTH)) {
     const [, width, depth, height, low, high] = match;
     const inches =
@@ -96,13 +96,16 @@ function lengthReplacements(text: string, locale?: string): Replacement[] {
     if (!inches || inches.some((inch) => inch === null)) continue;
     const start = match.index;
     const end = start + match[0].length;
-    const before = metric.find((m) => m.end <= start && /^\s*\/\s*$/.test(text.slice(m.end, start)));
-    const after = metric.find((m) => m.start >= end && PAIR_OPEN.test(text.slice(end, m.start)));
-    const afterEnd = after ? pairEnd(text, end, after.start, after.end) : null;
-    if (before) {
-      replacements.push({ start: before.start, end, text: text.slice(before.start, before.end) });
-    } else if (after && afterEnd !== null) {
-      replacements.push({ start, end: afterEnd, text: text.slice(after.start, after.end) });
+    const metricBefore = siteMetric.find((m) => m.end <= start && /^\s*\/\s*$/.test(text.slice(m.end, start)));
+    const metricAfter = siteMetric.find((m) => m.start >= end && PAIR_OPEN.test(text.slice(end, m.start)));
+    if (metricBefore) {
+      replacements.push({ start: metricBefore.start, end, text: text.slice(metricBefore.start, metricBefore.end) });
+    } else if (metricAfter) {
+      // A bracket that's never closed can't be read, so the length stays as written.
+      const pairEnded = pairEnd(text, end, metricAfter.start, metricAfter.end);
+      if (pairEnded !== null) {
+        replacements.push({ start, end: pairEnded, text: text.slice(metricAfter.start, metricAfter.end) });
+      }
     } else {
       const cm = (inches as number[]).map((inch) => inch * 2.54);
       replacements.push({ start, end, text: formatLength(cm, width !== undefined ? "×" : "–", locale) });

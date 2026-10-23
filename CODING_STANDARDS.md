@@ -5,7 +5,7 @@ Rules for reviewing a change. Type errors, test failures and manifest problems a
 ## Tests
 
 - **Behaviour only.** A test checks what an action leaves on the page (text, markup, tooltips, the scaling control in its shadow root) or what a line becomes. It never checks internal data shapes, which helper ran, or intermediate parse results, so refactoring the internals breaks nothing.
-- **Two seams.** Page behaviour is tested through `attach` / `attachToSelection` and the returned controller, in jsdom (`test/attach.test.ts`); line rules through `rewriteLine`, table-driven (`test/rewriteLine.test.ts`). A new test goes at one of these seams.
+- **Two seams.** Page behaviour is tested through `attach` / `attachWhenReady` / `attachToSelection` and the returned controller, in jsdom (`test/attach.test.ts`); line rules through `rewriteLine`, table-driven (`test/rewriteLine.test.ts`). A new test goes at one of these seams.
 - **Independent expectations.** Expected values are literals worked out from the spec or a real page: "180 g", "1½ cups". An expectation computed the way the code computes it passes by construction.
 - **Spec wording.** A test name states the behaviour the issue asks for, in the issue's words. A name that describes what the code happens to do ("above the selected list" when the issue says "above the selection") hides a mismatch with the spec.
 - **Real pages.** A site that breaks becomes a trimmed fixture in `test/fixtures/`.

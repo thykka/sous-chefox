@@ -1,4 +1,4 @@
-import { attachToSelection, attachWhenReady, type RecipeController } from "./core/attach";
+import { attach, attachToSelection, attachWhenReady, type RecipeController } from "./core/attach";
 import type { Messages } from "./core/scaleControl";
 import { CONVERT_SELECTION } from "./messages";
 import { loadSettings, onSettingsChanged, siteSettings, type StoredSettings } from "./settings";
@@ -39,8 +39,9 @@ void loadSettings().then((loaded) => {
     stored = changed;
     const settings = currentSettings();
     for (const selected of manual) selected.setSettings(settings);
+    // The page is watched for a late list only once, after it loads.
     if (controller) controller.setSettings(settings);
-    else if (!watching) attachToPage();
+    else if (!watching) controller = attach(document, settings, messages);
   });
 });
 

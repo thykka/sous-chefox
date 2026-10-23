@@ -27,7 +27,13 @@ export function attach(doc: Document, settings: Settings, messages: Messages = E
   const list = locateList(doc, recipe.ingredients);
   if (!list || linesOf(list).some(isManaged)) return null;
   const instructions = locateList(doc, recipe.instructions);
-  const steps = instructions && !instructions.contains(list) && !list.contains(instructions) ? instructions : null;
+  const steps =
+    instructions &&
+    !instructions.contains(list) &&
+    !list.contains(instructions) &&
+    !linesOf(instructions).some(isManaged)
+      ? instructions
+      : null;
   return createController(
     {
       ingredients: linesOf(list),

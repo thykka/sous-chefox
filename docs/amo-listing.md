@@ -20,7 +20,7 @@ A line Sous-Chefox can't fully read is left exactly as written, and a page where
 
 ## Why Sous-Chefox needs access to all websites
 
-Recipes are published on thousands of sites, so Sous-Chefox can't know in advance which pages hold one. On every page it loads, it checks locally for the structured recipe data that recipe sites publish (schema.org Recipe). If there is none, it exits immediately and changes nothing. The check runs entirely in your browser.
+Recipes are published on thousands of sites, so Sous-Chefox can't know in advance which pages hold one. On every page it loads, it checks locally for the structured recipe data that recipe sites publish (schema.org Recipe). If there is none, it stops there and leaves the page alone. The check runs entirely in your browser.
 
 ## Privacy
 
