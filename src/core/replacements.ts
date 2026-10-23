@@ -57,9 +57,9 @@ const LOOSE_QUANTITY = new RegExp(
 );
 
 // A number with no unit: not part of a word, a size ("8-inch", "9x13"), a percentage
-// or a temperature.
+// ("2%", "60 percent") or a temperature.
 const COUNT = new RegExp(
-  String.raw`${AMOUNT_BOUNDARY}(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?(?![\w%°º″"'×]|\s*[x×]\s*\d|\s*-\s*\w)`,
+  String.raw`${AMOUNT_BOUNDARY}(${AMOUNT})(?:(?:${RANGE_SEPARATOR})(${AMOUNT}))?(?![\w%°º″"'×]|\s*[x×]\s*\d|\s*-\s*\w|\s+per\s?cent(?!\w))`,
   "gi",
 );
 
@@ -201,15 +201,24 @@ function markPackageSizes(line: string, counts: Count[], measures: Measure[]): v
   for (const measure of packageSizesAmong(line, counts, measures)) measure.packageSize = true;
 }
 
-/** The amounts in a line that are package sizes, as in "2 (14 oz) cans". */
+/**
+ * The amounts in a line that are package sizes, as in "2 (14 oz) cans", or the size of
+ * each thing counted, as in "2 eggs (55 g each)".
+ */
 function packageSizesAmong<T extends { start: number }>(line: string, counts: Count[], amounts: T[]): Set<T> {
   const sizes = new Set<T>();
   for (const count of counts) {
     const next = amounts.find((amount) => amount.start >= count.end);
     if (next && PACKAGE_JOIN.test(line.slice(count.end, next.start))) sizes.add(next);
   }
+  for (const amount of amounts) {
+    if (insideParentheses(line, amount.start) && EACH.test(line.slice(amount.start))) sizes.add(amount);
+  }
   return sizes;
 }
+
+// The rest of a parenthetical that gives the size of each thing: "55 g each)".
+const EACH = /^[^()]*\beach\b[^()]*\)/i;
 
 // How two amounts for the same thing sit together: "1 cup (120 g)", "200 g / 7 oz".
 const PAIR_OPEN = /^\s*[([]\s*$/;

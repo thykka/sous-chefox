@@ -39,10 +39,17 @@ export function locateList(doc: Document, lines: string[]): Element | null {
   return best;
 }
 
-/** Lists and every element that contains one, in document order. */
+/**
+ * Lists and every element that contains one, in document order. A run of paragraphs
+ * with nothing else beside them counts as a list, as on sites that write each
+ * ingredient as a `<p>`.
+ */
 function candidatesOf(doc: Document): Element[] {
   const candidates = new Set<Element>();
-  for (const list of doc.body?.querySelectorAll("ul, ol") ?? []) {
+  const paragraphLists = [...(doc.body?.querySelectorAll("p:first-child") ?? [])]
+    .map((p) => p.parentElement!)
+    .filter((parent) => parent.children.length > 1 && [...parent.children].every((child) => child.tagName === "P"));
+  for (const list of [...(doc.body?.querySelectorAll("ul, ol") ?? []), ...paragraphLists]) {
     for (let el: Element | null = list; el && el !== doc.body; el = el.parentElement) {
       candidates.add(el);
     }

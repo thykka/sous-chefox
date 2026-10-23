@@ -43,8 +43,8 @@ export const AMOUNT = [
  */
 export const AMOUNT_BOUNDARY = String.raw`(?<![\w.,⁄])(?<!\d\s*[/⁄]\s*)`;
 
-/** What joins the two ends of a range: "2-3", "2 – 3", "2 to 3", "1 or 2". */
-export const RANGE_SEPARATOR = String.raw`\s*[-–—]\s*|\s+(?:to|or)\s+`;
+/** What joins the two ends of a range: "2-3", "2 – 3", "2 to 3", "1 or 2", "6- to 8-oz.". */
+export const RANGE_SEPARATOR = String.raw`\s*[-–—]\s*(?:(?:to|or)\s+)?|\s+(?:to|or)\s+`;
 
 const MIXED = new RegExp(String.raw`^(\d+)(?:\s+|\s*-\s*)(\d+)\s*[/⁄]\s*(\d+)$`);
 const MIXED_UNICODE = new RegExp(String.raw`^(\d+)\s*(${UNICODE_FRACTION})$`);

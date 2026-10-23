@@ -41,6 +41,44 @@ export function attach(doc: Document, settings: Settings, messages: Messages = E
   );
 }
 
+/** How long a recipe page is watched for an ingredient list rendered after it loads. */
+const WATCH_MS = 4000;
+/** The shortest gap between two tries at attaching while the page keeps changing. */
+const RETRY_MS = 100;
+
+/**
+ * Like `attach`, but when a recipe page's ingredient list isn't there yet, watches the
+ * page for a few seconds in case it's rendered late, then stops for good.
+ */
+export function attachWhenReady(
+  doc: Document,
+  settings: Settings,
+  messages: Messages = ENGLISH,
+): Promise<RecipeController | null> {
+  const controller = attach(doc, settings, messages);
+  if (controller || settings.siteDisabled || !detectRecipe(doc) || !doc.body) return Promise.resolve(controller);
+  const view = doc.defaultView ?? globalThis;
+  return new Promise((resolve) => {
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    const finish = (result: RecipeController | null) => {
+      observer.disconnect();
+      view.clearTimeout(deadline);
+      if (retry !== null) view.clearTimeout(retry);
+      resolve(result);
+    };
+    const tryAttach = () => {
+      retry = null;
+      const attached = attach(doc, settings, messages);
+      if (attached) finish(attached);
+    };
+    const observer = new view.MutationObserver(() => {
+      retry ??= view.setTimeout(tryAttach, RETRY_MS);
+    });
+    const deadline = view.setTimeout(() => finish(null), WATCH_MS);
+    observer.observe(doc.body!, { childList: true, subtree: true, characterData: true });
+  });
+}
+
 /**
  * Converts the lines a selection touches, as a manual stand-in for `attach` on pages
  * without structured data. Nothing is remembered. Null when there's nothing in the

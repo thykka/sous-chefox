@@ -109,6 +109,7 @@ describe("rewriteLine converts ranges at both ends", () => {
     ["litres at both ends", "6-8 cups stock", "1.4–1.9 l stock"],
     ["weight", "2-3 lb potatoes", "910 g–1.4 kg potatoes"],
     ["ends rounding to the same amount", "1 to 1⅛ tsp salt", "5 ml salt"],
+    ["hyphen before a worded end", "6- to 8-oz. chicken breasts", "170–230 g chicken breasts"],
   ])("%s: %s → %s", (_, line, expected) => {
     expect(rewriteLine(line, metric)).toBe(expected);
   });
@@ -313,6 +314,7 @@ describe("rewriteLine scales plain counts", () => {
     ["size", "1 (8-inch) pie crust", 2, "2 (8-inch) pie crust"],
     ["size before the thing", "2 9-inch pie crusts", 2, "4 9-inch pie crusts"],
     ["percentage", "1 cup 2% milk", 2, "470 ml 2% milk"],
+    ["percentage in words", "8 oz chocolate, at least 60 percent cacao", 2, "450 g chocolate, at least 60 percent cacao"],
     ["count in parentheses", "salt (about 2 pinches)", 2, null],
   ])("leaves non-counts alone: %s: %s × %s → %s", (_, line, scale, expected) => {
     expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
@@ -340,6 +342,8 @@ describe("rewriteLine scales package lines by their count", () => {
     ["without parentheses", "2 15-oz cans black beans", 1.5, "3 430 g cans black beans"],
     ["liquid size", "1 (14 oz) can coconut milk", 2, "2 (410 ml) can coconut milk"],
     ["size after the package word", "1 can (14 oz) tomatoes", 2, "2 can (400 g) tomatoes"],
+    ["size as a range", "4 (6- to 8-oz.) chicken breasts", 2, "8 (170–230 g) chicken breasts"],
+    ["size of each", "2 eggs (55 g each)", 2, "4 eggs (55 g each)"],
   ])("%s: %s × %s → %s", (_, line, scale, expected) => {
     expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
   });
@@ -372,6 +376,7 @@ describe("rewriteLine scales in the original units with metric off", () => {
     ["8 oz cheese", "16 oz cheese"],
     ["1 stick butter", "2 sticks butter"],
     ["2 (14 oz) cans tomatoes", "4 (14 oz) cans tomatoes"],
+    ["2 eggs (2 oz each)", "4 eggs (2 oz each)"],
     ["1 15-ounce can beans", "2 15-ounce can beans"],
     ["a 15-ounce can beans", "a 30-ounce can beans"],
     ["3 large eggs", "6 large eggs"],
