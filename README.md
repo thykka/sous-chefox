@@ -16,6 +16,8 @@ npm run lint       # build, then web-ext lint
 
 The extension is built into `dist/`.
 
+The manifest needs Firefox 140 or later. `npm start` uses Firefox Developer Edition when it's installed in the default location, and release Firefox otherwise. To pick a different one, run `WEB_EXT_FIREFOX=<path or name> npm start`.
+
 ## Fixtures
 
 Test fixtures in `test/fixtures/` are trimmed snapshots of real recipe pages.
