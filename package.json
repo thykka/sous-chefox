@@ -5,9 +5,9 @@
   "type": "module",
   "description": "A Firefox extension for unit conversions and calculations in recipes.",
   "scripts": {
-    "build": "vite build && vite build --mode popup",
-    "start": "vite build && web-ext run",
-    "lint": "vite build && web-ext lint",
+    "build": "vite build && vite build --mode popup && vite build --mode background",
+    "start": "npm run build && web-ext run",
+    "lint": "npm run build && web-ext lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

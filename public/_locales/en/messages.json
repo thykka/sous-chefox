@@ -38,5 +38,9 @@
   "popupDisableSite": {
     "message": "Disable on this site",
     "description": "Popup switch that turns the extension off on the current tab's site, shown with the site's hostname below it."
+  },
+  "menuConvertSelection": {
+    "message": "Convert with Sous-Chefox",
+    "description": "Context menu entry for selected text that converts and scales the selected ingredient lines."
   }
 }

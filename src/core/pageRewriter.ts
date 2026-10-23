@@ -1,5 +1,5 @@
 import type { Replacement } from "./replacements";
-import { textNodesOf } from "./visibleText";
+import { textLinesOf } from "./visibleText";
 
 const MARKER_CLASS = "sous-chefox-converted";
 
@@ -15,7 +15,7 @@ export type FindReplacements = (line: string) => Replacement[];
  * page had.
  */
 export function rewriteLines(lines: Element[], find: FindReplacements): () => void {
-  let swaps = lines.flatMap((line) => rewriteLineElement(line, find));
+  let swaps = lines.flatMap(textLinesOf).flatMap((nodes) => rewriteLine(nodes, find));
   return () => {
     const undone = swaps;
     swaps = [];
@@ -32,13 +32,17 @@ export function linesOf(list: Element): Element[] {
   return items.length > 0 ? items : [...list.children];
 }
 
-function rewriteLineElement(line: Element, find: FindReplacements): Swap[] {
-  const nodes = textNodesOf(line);
-  const text = nodes.map((node) => node.data).join("");
+/** The text of a line, from the text nodes that make it up. */
+export function lineText(nodes: Text[]): string {
+  return nodes.map((node) => node.data).join("");
+}
+
+function rewriteLine(nodes: Text[], find: FindReplacements): Swap[] {
+  const text = lineText(nodes);
   const replacements = find(text);
   if (replacements.length === 0) return [];
 
-  const doc = line.ownerDocument;
+  const doc = nodes[0]!.ownerDocument;
   const swaps: Swap[] = [];
   let nodeStart = 0;
   for (const node of nodes) {

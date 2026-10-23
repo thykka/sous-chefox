@@ -16,7 +16,10 @@
       "strict_min_version": "142.0"
     }
   },
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "menus"],
+  "background": {
+    "scripts": ["background.js"]
+  },
   "action": {
     "default_title": "__MSG_extensionName__",
     "default_popup": "popup.html"

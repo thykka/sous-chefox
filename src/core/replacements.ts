@@ -107,6 +107,11 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
   return [...measured, ...scaleCounts(counts, options)].sort((a, b) => a.start - b.start);
 }
 
+/** Whether a line has an amount to convert or scale: exactly when scaling changes it. */
+export function hasAmount(line: string): boolean {
+  return scaleAsWritten(line, { scale: 2, metric: false }).length > 0;
+}
+
 /**
  * With metric off, scales the amounts in the units they're written in: imperial ones as
  * common fractions ("1½ cups"), metric ones rounded like a conversion would be.

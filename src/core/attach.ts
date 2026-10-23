@@ -1,10 +1,12 @@
 import { detectRecipe } from "./detectRecipe";
 import { findInstructionReplacements } from "./instructions";
 import { locateList } from "./locateList";
-import { linesOf, rewriteLines } from "./pageRewriter";
-import { findReplacements, isMetricRecipe } from "./replacements";
+import { lineText, linesOf, rewriteLines } from "./pageRewriter";
+import { findReplacements, hasAmount, isMetricRecipe } from "./replacements";
 import { createScaleControl, ENGLISH, isValidScale, type Messages, type ScaleControl } from "./scaleControl";
+import { selectedLines } from "./selection";
 import { parseServings } from "./servings";
+import { textLinesOf } from "./visibleText";
 
 export type Settings = { metric: boolean; siteDisabled: boolean };
 
@@ -40,6 +42,32 @@ export function attach(doc: Document, settings: Settings, messages: Messages = E
 }
 
 /**
+ * Converts the lines a selection touches, as a manual stand-in for `attach` on pages
+ * without structured data. Nothing is remembered. Null when there's nothing in the
+ * selection to convert or scale.
+ */
+export function attachToSelection(
+  doc: Document,
+  range: Range,
+  settings: Settings,
+  messages: Messages = ENGLISH,
+): RecipeController | null {
+  if (settings.siteDisabled || range.collapsed) return null;
+  const lines = selectedLines(range);
+  if (lines.some(isManaged)) return null;
+  const texts = lines.flatMap(textLinesOf).map(lineText);
+  if (lines.length === 0 || !texts.some(hasAmount)) return null;
+  // Lines in one list get the control above the list, as for `attach`.
+  const list = lines[0]!.closest("ul, ol");
+  const anchor = list && lines.every((line) => line.tagName === "LI" && list.contains(line)) ? list : lines[0]!;
+  return createController(
+    { ingredients: lines, steps: [], anchor, servings: null, metricRecipe: isMetricRecipe(texts) },
+    settings,
+    messages,
+  );
+}
+
+/**
  * What a controller rewrites: the ingredient lines, the instruction steps, where the
  * scaling control goes, the servings at 1× (if known), and whether the ingredients are
  * metric already.
@@ -54,6 +82,15 @@ type Target = {
 
 const nothing = () => {};
 
+/** Lines a controller looks after, so a selection over them isn't converted twice. */
+const managed = new WeakSet<Element>();
+
+/** Whether a line is, holds or lies inside a line a controller looks after. */
+function isManaged(line: Element): boolean {
+  for (let el: Element | null = line; el; el = el.parentElement) if (managed.has(el)) return true;
+  return [...line.querySelectorAll("*")].some((el) => managed.has(el));
+}
+
 function createController(target: Target, initial: Settings, messages: Messages): RecipeController {
   let settings = initial;
   // The scale always starts at 1 and is never saved.
@@ -62,6 +99,7 @@ function createController(target: Target, initial: Settings, messages: Messages)
   let revertIngredients = nothing;
   let revertSteps = nothing;
   let reverted = false;
+  for (const line of target.ingredients) managed.add(line);
 
   const renderIngredients = () => {
     // A recipe that's already metric has nothing to convert until it's scaled.
@@ -124,8 +162,10 @@ function createController(target: Target, initial: Settings, messages: Messages)
       }
     },
     revert() {
+      if (reverted) return;
       reverted = true;
       unmount();
+      for (const line of target.ingredients) managed.delete(line);
     },
   };
 }
