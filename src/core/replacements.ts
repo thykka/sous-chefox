@@ -7,9 +7,9 @@ export type LineOptions = { scale: number; metric: boolean; locale?: string };
 
 /**
  * A piece of a line to swap out: `text` replaces `line.slice(start, end)`. `original`
- * is what the tooltip shows, when it's more than the piece itself.
+ * is what the tooltip shows when it isn't the piece itself, or null for no tooltip.
  */
-export type Replacement = { start: number; end: number; text: string; original?: string };
+export type Replacement = { start: number; end: number; text: string; original?: string | null };
 
 /** An amount (or range) as written: one value, or both ends of a range. */
 type Quantity = { start: number; end: number; amounts: number[]; unit: Unit };
@@ -34,9 +34,11 @@ type Count = { start: number; end: number; values: number[] };
 
 /**
  * A measure to write into the line over `start`–`end`. A metric amount the site gave
- * alongside imperial carries its own text, which is shown as written.
+ * alongside imperial carries its own text, which is shown as written. A piece that
+ * stands for more than its own text (`joined`) shows the whole line as its tooltip;
+ * a `removed` one is the site's metric amount, already shown elsewhere in the line.
  */
-type Piece = { start: number; end: number; measure: Measure; siteText?: string };
+type Piece = { start: number; end: number; measure: Measure; siteText?: string; joined?: true; removed?: true };
 
 // The unit may be hyphenated on, as in "a 15-ounce can".
 const QUANTITY = new RegExp(
@@ -64,8 +66,10 @@ const COUNT_BEFORE_PACKAGE = new RegExp(String.raw`^(?:${AMOUNT})\s+$`);
 // What joins the parts of a compound amount, as in "1 cup plus 2 tbsp".
 const COMPOUND_JOIN = /^\s*(?:\+|plus)\s*$/i;
 
-// What sits between a count and its package size: "2 (14 oz) cans", "1 15-oz can".
-const PACKAGE_JOIN = /^\s*\(?\s*$/;
+// What sits between a count and its package size: "2 (14 oz) cans", "1 15-oz can",
+// "1 can (14 oz)". Other words in between ("3 eggs (150 g)") give a total instead.
+const PACKAGE_JOIN =
+  /^\s*(?:\(|(?:cans?|tins?|jars?|packages?|pkgs?\.?|packets?|bottles?|box(?:es)?|bags?|cartons?|containers?|blocks?)\s*\()?\s*$/i;
 
 export function findReplacements(line: string, options: LineOptions): Replacement[] {
   // Scaling amounts in their original units comes with the settings popup.
@@ -85,7 +89,8 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
   const pieces = pairWithSiteMetric(line, combined, scaling);
   if (!pieces) return [];
 
-  const measured = pieces.map(({ start, end, measure, siteText }): Replacement => {
+  const measured = pieces.map(({ start, end, measure, siteText, joined, removed }): Replacement => {
+    if (removed) return { start, end, text: "", original: null };
     const scale = measure.packageSize ? 1 : options.scale;
     const text =
       siteText !== undefined && scale === 1
@@ -95,7 +100,7 @@ export function findReplacements(line: string, options: LineOptions): Replacemen
             measure.dimension,
             { locale: options.locale, whole: measure.whole },
           );
-    return siteText === undefined ? { start, end, text } : { start, end, text, original: line.trim() };
+    return joined ? { start, end, text, original: line.trim() } : { start, end, text };
   });
   const counted = counts.map(({ start, end, values }) => ({
     start,
@@ -142,36 +147,71 @@ function markPackageSizes(line: string, counts: Count[], measures: Measure[]): v
   }
 }
 
-// How a metric amount sits next to an imperial one: "1 cup (120 g)", "200 g / 7 oz".
+// How two amounts for the same thing sit together: "1 cup (120 g)", "200 g / 7 oz".
 const PAIR_OPEN = /^\s*[([]\s*$/;
 const PAIR_CLOSE = /^\s*[)\]]/;
 const PAIR_SLASH = /^\s*\/\s*$/;
 
 /**
- * Joins each imperial measure with a metric amount written right next to it, either
- * order, so the site's own figure replaces both. Null when the line has a metric
- * amount that isn't paired like that, unless `keepUnpaired` keeps it as a piece too.
+ * Joins amounts given twice for the same thing so one figure replaces both: the site's
+ * metric amount when there is one ("1 cup (120 g)", either order), otherwise the first
+ * ("1 cup (2 sticks)"). A metric amount elsewhere in the line ("1 cup sugar (200 g)")
+ * stands in for the line's only imperial amount and is removed from where it was.
+ * Null when a metric amount can't be placed like that, unless `keepUnpaired` keeps it
+ * as a piece of its own.
  */
 function pairWithSiteMetric(line: string, measures: Measure[], keepUnpaired: boolean): Piece[] | null {
   const pieces: Piece[] = [];
   for (let i = 0; i < measures.length; i++) {
     const first = measures[i]!;
     const second = measures[i + 1];
-    if (second && first.metric !== second.metric) {
-      const between = line.slice(first.end, second.start);
-      const close = line.slice(second.end).match(PAIR_CLOSE);
-      const end = PAIR_SLASH.test(between) ? second.end : PAIR_OPEN.test(between) && close ? second.end + close[0].length : null;
-      if (end !== null) {
-        const metric = first.metric ? first : second;
-        pieces.push({ start: first.start, end, measure: metric, siteText: line.slice(metric.start, metric.end) });
-        i++;
-        continue;
-      }
+    const end = second && !(first.metric && second.metric) ? pairEnd(line, first, second) : null;
+    if (end !== null) {
+      const kept = second!.metric ? second! : first;
+      const siteText = kept.metric ? line.slice(kept.start, kept.end) : undefined;
+      pieces.push({ start: first.start, end, measure: kept, ...(siteText !== undefined && { siteText }), joined: true });
+      i++;
+    } else {
+      pieces.push({ start: first.start, end: first.end, measure: first });
     }
-    if (first.metric && !keepUnpaired) return null;
-    pieces.push({ start: first.start, end: first.end, measure: first });
   }
-  return pieces;
+
+  const loose = pieces.filter((piece) => piece.measure.metric && !piece.joined);
+  if (loose.length === 0) return pieces;
+  const imperial = pieces.filter((piece) => !piece.measure.metric && !piece.joined);
+  const parenthetical = loose.length === 1 && imperial.length === 1 ? enclosingParentheses(line, loose[0]!.measure) : null;
+  if (parenthetical && pieces.every((piece) => piece === loose[0] || piece.end <= parenthetical.start || piece.start >= parenthetical.end)) {
+    const metric = loose[0]!.measure;
+    const target = imperial[0]!;
+    return pieces
+      .map((piece): Piece => {
+        if (piece === target) return { ...target, measure: metric, siteText: line.slice(metric.start, metric.end), joined: true };
+        if (piece === loose[0]) return { ...parenthetical, measure: metric, removed: true };
+        return piece;
+      })
+      .sort((a, b) => a.start - b.start);
+  }
+  return keepUnpaired ? pieces : null;
+}
+
+/** Where a pair of amounts written side by side ends, or null when they aren't a pair. */
+function pairEnd(line: string, first: Measure, second: Measure): number | null {
+  const between = line.slice(first.end, second.start);
+  if (PAIR_SLASH.test(between)) return second.end;
+  const close = line.slice(second.end).match(PAIR_CLOSE);
+  return PAIR_OPEN.test(between) && close ? second.end + close[0].length : null;
+}
+
+/** The parentheses around a measure, with the space before them, as in " (about 120 g)". */
+function enclosingParentheses(line: string, measure: Measure): { start: number; end: number } | null {
+  const open = line.lastIndexOf("(", measure.start);
+  const close = line.indexOf(")", measure.end);
+  if (open === -1 || close === -1 || line.slice(open, measure.start).includes(")") || line.slice(measure.end, close).includes("(")) {
+    return null;
+  }
+  let start = open;
+  while (start > 0 && /\s/.test(line[start - 1]!)) start--;
+  return { start, end: close + 1 };
 }
 
 /**
@@ -201,7 +241,7 @@ function nameOf(line: string, quantities: Quantity[]): string {
 function toMetric(quantities: Quantity[], ingredient: IngredientMatch): Measure[] | null {
   const measures: Measure[] = [];
   for (const { start, end, amounts, unit } of quantities) {
-    const measure = (dimension: Dimension, size: number, whole = false) =>
+    const push = (dimension: Dimension, size: number, whole = false) =>
       measures.push({
         start,
         end,
@@ -212,16 +252,16 @@ function toMetric(quantities: Quantity[], ingredient: IngredientMatch): Measure[
         packageSize: false,
       });
     if (unit.metric) {
-      measure(unit.dimension, unit.size);
+      push(unit.dimension, unit.size);
     } else if (unit.stick) {
       if (ingredient?.kind !== "dry" || !ingredient.sticks) return null;
-      measure("weight", unit.size, true);
+      push("weight", unit.size, true);
     } else if (unit.ounce && ingredient?.kind === "liquid") {
-      measure("volume", FLUID_OUNCE_ML);
+      push("volume", FLUID_OUNCE_ML);
     } else if (unit.dimension === "volume" && ingredient?.kind === "dry") {
-      measure("weight", unit.size * ingredient.gramsPerMl);
+      push("weight", unit.size * ingredient.gramsPerMl);
     } else {
-      measure(unit.dimension, unit.size);
+      push(unit.dimension, unit.size);
     }
   }
   return measures;

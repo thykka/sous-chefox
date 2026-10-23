@@ -41,16 +41,16 @@ export function attach(doc: Document, settings: Settings, messages: Messages = E
     steps && settings.metric ? rewriteList(steps, (line) => findInstructionReplacements(line)) : () => {};
 
   let reverted = false;
-  const applyScale = (factor: number) => {
-    if (reverted || !isValidScale(factor)) return;
+  /** Re-renders the ingredients at `factor`; false when it isn't a scale to apply. */
+  const applyScale = (factor: number): boolean => {
+    if (reverted || !isValidScale(factor)) return false;
     revertIngredients();
     scale = factor;
     revertIngredients = renderIngredients();
+    return true;
   };
   const setScale = (factor: number) => {
-    if (reverted || !isValidScale(factor)) return;
-    applyScale(factor);
-    control.show(factor);
+    if (applyScale(factor)) control.show(factor);
   };
   const control = createScaleControl(list, messages, applyScale, () => setScale(1));
 

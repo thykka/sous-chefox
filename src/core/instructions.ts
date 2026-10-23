@@ -2,7 +2,8 @@ import { AMOUNT, AMOUNT_BOUNDARY, RANGE_SEPARATOR, parseAmount, parseAmounts } f
 import { formatLength, formatTemperature } from "./format";
 import type { Replacement } from "./replacements";
 
-const DEGREE = String.raw`\s*[°º˚]\s*|\s*[Dd]egrees?\s+|\s?`;
+// "350°F", "350 degrees F", or an F written straight onto the number ("375F").
+const DEGREE = String.raw`\s*[°º˚]\s*|\s*[Dd]egrees?\s+|`;
 const FAHRENHEIT = String.raw`(?:${DEGREE})(?:F|[Ff]ahrenheit)(?!\w)`;
 const CELSIUS = String.raw`(?:${DEGREE})(?:C|[Cc]elsius|[Cc]entigrade)(?!\w)`;
 const TEMPERATURE = new RegExp(
@@ -10,10 +11,11 @@ const TEMPERATURE = new RegExp(
   "g",
 );
 
-const INCH = String.raw`\s*-?\s*(?:inch(?:es)?|″)(?!\w)`;
+// "9-inch", "2 inches", "9″", or an inch mark straight after the number ('10"').
+const INCH = String.raw`(?:\s*-?\s*(?:inch(?:es)?|″)|")(?!\w)`;
 const BY = String.raw`\s*(?:[x×X]|by)\s*`;
 // A pan size written without a unit ("an 8x8 baking dish") is in inches.
-const PAN = String.raw`(?=\s+(?:[\w-]+\s+){0,2}(?:pans?|dish(?:es)?|tins?|skillets?|sheets?|casseroles?)(?!\w))`;
+const PAN = String.raw`(?=\s+(?:[\w-]+\s+){0,2}(?:pans?|dish(?:es)?|tins?|skillets?|casseroles?|baking\s+sheets?)(?!\w))`;
 const LENGTH = new RegExp(
   [
     String.raw`${AMOUNT_BOUNDARY}(${AMOUNT})${BY}(${AMOUNT})(?:${BY}(${AMOUNT}))?(?:${INCH}|${PAN})`,

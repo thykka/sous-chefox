@@ -262,6 +262,11 @@ describe("rewriteLine prefers a metric amount already in the line", () => {
     ["kilograms", "2 lb (1 kg) potatoes", "1 kg potatoes"],
     ["litres", "1 quart (1 litre) stock", "1 litre stock"],
     ["imperial amount without a metric twin still converts", "1 cup (120 g) flour plus 2 tbsp milk", "120 g flour plus 30 ml milk"],
+    ["metric after the name", "1 cup granulated sugar (200g)", "200g granulated sugar"],
+    ["metric after the name with words", "1 cup flour (about 120 g), sifted", "120 g flour, sifted"],
+    ["two imperial amounts for one", "1 cup (2 sticks) butter", "230 g butter"],
+    ["two imperial amounts, sticks first", "2 sticks (1 cup) butter", "226 g butter"],
+    ["two imperial amounts of different kinds", "8 oz (1 cup) sour cream", "230 g sour cream"],
   ])("%s: %s → %s", (_, line, expected) => {
     expect(rewriteLine(line, metric)).toBe(expected);
   });
@@ -279,7 +284,7 @@ describe("rewriteLine prefers a metric amount already in the line", () => {
     ["kilograms", "1 kg potatoes"],
     ["range", "100-150 g sugar"],
     ["words", "500 grams flour"],
-    ["metric amount apart from the imperial one", "1 cup flour (about 120 g)"],
+    ["metric amount not in parentheses", "1 cup milk, or 240 ml"],
   ])("leaves the line unchanged: %s: %s", (_, line) => {
     expect(rewriteLine(line, metric)).toBeNull();
   });
@@ -334,6 +339,7 @@ describe("rewriteLine scales package lines by their count", () => {
     ["hyphenated size", "1 (15-ounce) can black beans", 2, "2 (430 g) can black beans"],
     ["without parentheses", "2 15-oz cans black beans", 1.5, "3 430 g cans black beans"],
     ["liquid size", "1 (14 oz) can coconut milk", 2, "2 (410 ml) can coconut milk"],
+    ["size after the package word", "1 can (14 oz) tomatoes", 2, "2 can (400 g) tomatoes"],
   ])("%s: %s × %s → %s", (_, line, scale, expected) => {
     expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
   });
@@ -344,7 +350,8 @@ describe("rewriteLine scales metric amounts", () => {
     ["metric only", "100g plain flour", 2, "200 g plain flour"],
     ["metric range", "100-150 g sugar", 2, "200–300 g sugar"],
     ["into litres", "600 ml milk", 2, "1.2 l milk"],
-    ["metric apart from the imperial one", "1 cup flour (about 120 g)", 2, "240 g flour (about 240 g)"],
+    ["metric after the name", "1 cup milk (240 ml)", 2, "480 ml milk"],
+    ["metric not in parentheses", "1 cup milk, or 240 ml", 2, "470 ml milk, or 480 ml"],
     ["stick", "1 stick butter", 1.5, "170 g butter"],
   ])("%s: %s × %s → %s", (_, line, scale, expected) => {
     expect(rewriteLine(line, { ...metric, scale })).toBe(expected);

@@ -7,8 +7,8 @@ export const ENGLISH: Messages = {
   scaleHint: "A number from 0.1 to 20",
 };
 
-export const MIN_SCALE = 0.1;
-export const MAX_SCALE = 20;
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 20;
 
 export function isValidScale(factor: number): boolean {
   return Number.isFinite(factor) && factor >= MIN_SCALE && factor <= MAX_SCALE;

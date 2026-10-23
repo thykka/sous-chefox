@@ -52,7 +52,8 @@ function rewriteLineElement(line: Element, find: FindReplacements): Swap[] {
         if (from > cursor) replacement.push(doc.createTextNode(text.slice(cursor, from)));
         // The whole replacement goes where the piece starts; nodes it spans into are emptied.
         const isStart = from === r.start;
-        replacement.push(marker(doc, isStart ? r.text : "", isStart ? (r.original ?? text.slice(r.start, r.end)) : null));
+        const original = r.original === undefined ? text.slice(r.start, r.end) : r.original;
+        replacement.push(marker(doc, isStart ? r.text : "", isStart ? original : null));
         cursor = to;
       }
       if (cursor < nodeEnd) replacement.push(doc.createTextNode(text.slice(cursor, nodeEnd)));
