@@ -63,3 +63,35 @@ export function formatLength(cm: number[], separator: string, locale?: string): 
   }
   return `${cm.map((value) => number.format(roundTo(value, value < 10 ? 0.5 : 1))).join(separator)} cm`;
 }
+
+/** The fractions a cook reads at a glance, for counts that scaling made fractional. */
+const FRACTIONS: [number, string][] = [
+  [0, ""],
+  [1 / 8, "⅛"],
+  [1 / 6, "⅙"],
+  [1 / 4, "¼"],
+  [1 / 3, "⅓"],
+  [1 / 2, "½"],
+  [2 / 3, "⅔"],
+  [3 / 4, "¾"],
+  [1, ""],
+];
+
+/**
+ * A count, or a range of two, to the nearest common fraction: "1½", "¾", "3–4½".
+ * A count is never rounded away to nothing; the smallest is "⅛".
+ */
+export function formatCount(values: number[], locale?: string): string {
+  const number = new Intl.NumberFormat(locale ?? globalThis.navigator?.language);
+  const parts = values.map((value) => {
+    let whole = Math.floor(value);
+    const [fraction, glyph] = FRACTIONS.reduce((best, candidate) =>
+      Math.abs(candidate[0] - (value - whole)) < Math.abs(best[0] - (value - whole)) ? candidate : best,
+    );
+    if (fraction === 1) whole++;
+    if (whole === 0 && glyph === "") return "⅛";
+    return `${whole > 0 ? number.format(whole) : ""}${glyph}`;
+  });
+  const [low, high] = parts;
+  return high === undefined || high === low ? low! : `${low}–${high}`;
+}

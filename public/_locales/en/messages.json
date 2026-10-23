@@ -6,5 +6,17 @@
   "extensionDescription": {
     "message": "Converts recipe quantities to metric, right on the page.",
     "description": "Description of the extension shown in the add-ons manager."
+  },
+  "scaleLabel": {
+    "message": "Scale",
+    "description": "Label of the scale factor input above a recipe's ingredient list."
+  },
+  "scaleReset": {
+    "message": "Reset",
+    "description": "Button that sets the recipe's scale factor back to 1."
+  },
+  "scaleHint": {
+    "message": "A number from 0.1 to 20",
+    "description": "Tooltip of the scale factor input, describing what it accepts."
   }
 }

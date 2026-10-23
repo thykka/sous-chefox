@@ -284,3 +284,69 @@ describe("rewriteLine prefers a metric amount already in the line", () => {
     expect(rewriteLine(line, metric)).toBeNull();
   });
 });
+
+describe("rewriteLine scales plain counts", () => {
+  it.each([
+    ["to a fraction", "3 large eggs", 0.5, "1½ large eggs"],
+    ["whole", "3 large eggs", 2, "6 large eggs"],
+    ["below one", "1 large egg", 0.75, "¾ large egg"],
+    ["never rounded away", "1 egg", 0.1, "⅛ egg"],
+    ["nearest common fraction", "1 egg", 2.4, "2⅓ egg"],
+    ["rounding up to a whole", "3 eggs", 0.33, "1 eggs"],
+    ["fraction in the line", "½ onion, diced", 3, "1½ onion, diced"],
+    ["range", "2 to 3 eggs", 1.5, "3–4½ eggs"],
+    ["range with a hyphen", "2-3 cloves garlic", 2, "4–6 cloves garlic"],
+    ["after words", "Juice of 2 lemons", 1.5, "Juice of 3 lemons"],
+    ["more than one", "1 egg plus 1 egg yolk", 2, "2 egg plus 2 egg yolk"],
+    ["after a checkbox", "▢ 2 large eggs", 2, "▢ 4 large eggs"],
+    ["next to a quantity", "Juice of 1 lemon, about 2 tbsp", 2, "Juice of 2 lemon, about 60 ml"],
+  ])("%s: %s × %s → %s", (_, line, scale, expected) => {
+    expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
+  });
+
+  it.each([
+    ["size", "1 (8-inch) pie crust", 2, "2 (8-inch) pie crust"],
+    ["size before the thing", "2 9-inch pie crusts", 2, "4 9-inch pie crusts"],
+    ["percentage", "1 cup 2% milk", 2, "470 ml 2% milk"],
+    ["count in parentheses", "salt (about 2 pinches)", 2, null],
+  ])("leaves non-counts alone: %s: %s × %s → %s", (_, line, scale, expected) => {
+    expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
+  });
+
+  it.each([
+    ["no amount", "salt and pepper, to taste"],
+    ["pinch", "pinch of salt"],
+    ["unreadable count", "1/0 eggs"],
+  ])("leaves the line unscaled: %s: %s", (_, line) => {
+    expect(rewriteLine(line, { ...metric, scale: 2 })).toBeNull();
+  });
+
+  it("leaves counts alone at 1×", () => {
+    expect(rewriteLine("3 large eggs", metric)).toBeNull();
+  });
+});
+
+describe("rewriteLine scales package lines by their count", () => {
+  it.each([
+    ["converts the size at 1×", "2 (14 oz) cans diced tomatoes", 1, "2 (400 g) cans diced tomatoes"],
+    ["scales the count, not the size", "2 (14 oz) cans diced tomatoes", 2, "4 (400 g) cans diced tomatoes"],
+    ["to a fraction of a package", "1 (15 ounce) can chickpeas", 0.5, "½ (430 g) can chickpeas"],
+    ["hyphenated size", "1 (15-ounce) can black beans", 2, "2 (430 g) can black beans"],
+    ["without parentheses", "2 15-oz cans black beans", 1.5, "3 430 g cans black beans"],
+    ["liquid size", "1 (14 oz) can coconut milk", 2, "2 (410 ml) can coconut milk"],
+  ])("%s: %s × %s → %s", (_, line, scale, expected) => {
+    expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
+  });
+});
+
+describe("rewriteLine scales metric amounts", () => {
+  it.each([
+    ["metric only", "100g plain flour", 2, "200 g plain flour"],
+    ["metric range", "100-150 g sugar", 2, "200–300 g sugar"],
+    ["into litres", "600 ml milk", 2, "1.2 l milk"],
+    ["metric apart from the imperial one", "1 cup flour (about 120 g)", 2, "240 g flour (about 240 g)"],
+    ["stick", "1 stick butter", 1.5, "170 g butter"],
+  ])("%s: %s × %s → %s", (_, line, scale, expected) => {
+    expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
+  });
+});
