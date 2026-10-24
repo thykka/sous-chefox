@@ -1209,6 +1209,23 @@ describe("attachWhenReady on an ingredient list that appears late", () => {
       expect(doc.documentElement.outerHTML).toBe(before);
     });
 
+    it("stops searching after five tries on a page that keeps changing", async () => {
+      vi.useFakeTimers();
+      const { doc, putBack } = withoutList();
+      const attached = attachWhenReady(doc, settings);
+      // An ad slot refreshing every 50 ms: tries come 100, 200, 400, 800 and 1600 ms apart.
+      for (let elapsed = 0; elapsed < 3300; elapsed += 50) {
+        doc.body.append(doc.createElement("div"));
+        await vi.advanceTimersByTimeAsync(50);
+      }
+
+      putBack();
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(await attached).toBeNull();
+      expect(textsOf(doc, "ul li")).toEqual(ingredients);
+    });
+
     it("leaves the page unchanged when the list that appears can't be located confidently", async () => {
       vi.useFakeTimers();
       const { doc, list, putBack } = withoutList();

@@ -61,8 +61,10 @@ function attachController(doc: Document, settings: Settings, messages: Messages)
 
 /** How long a recipe page is watched for an ingredient list rendered after it loads. */
 const WATCH_MS = 4000;
-/** The shortest gap between two tries at attaching while the page keeps changing. */
+/** The gap before the first try at attaching after the page changes; it doubles after each try. */
 const RETRY_MS = 100;
+/** The most tries at attaching one watch makes: each searches the whole page. */
+const MAX_TRIES = 5;
 
 /** How long after attaching the page is watched for a site re-rendering the recipe. */
 const REATTACH_MS = 10000;
@@ -92,24 +94,13 @@ export function attachWhenReady(
 function keepAttached(doc: Document, first: Controller, settings: Settings, messages: Messages): RecipeController {
   let current = first;
   let latest = settings;
-  let stopped = false;
   const view = doc.defaultView ?? globalThis;
-  let retry: ReturnType<typeof setTimeout> | null = null;
-  const reattach = () => {
-    retry = null;
-    if (stopped || current.isConnected()) return;
+  const stop = watchChanges(doc, false, () => {
+    if (current.isConnected()) return null;
     current.revert();
     current = attachController(doc, latest, messages) ?? current;
-  };
-  const observer = new view.MutationObserver(() => {
-    retry ??= view.setTimeout(reattach, RETRY_MS);
+    return false;
   });
-  const stop = () => {
-    stopped = true;
-    observer.disconnect();
-    if (retry !== null) view.clearTimeout(retry);
-  };
-  observer.observe(doc.body!, { childList: true, subtree: true });
   view.setTimeout(stop, REATTACH_MS);
   return {
     setScale: (factor) => current.setScale(factor),
@@ -129,24 +120,63 @@ function waitForList(doc: Document, settings: Settings, messages: Messages): Pro
   if (controller || settings.siteDisabled || !detectRecipe(doc) || !doc.body) return Promise.resolve(controller);
   const view = doc.defaultView ?? globalThis;
   return new Promise((resolve) => {
-    let retry: ReturnType<typeof setTimeout> | null = null;
-    const finish = (result: Controller | null) => {
-      observer.disconnect();
+    let attached: Controller | null = null;
+    const finish = () => {
+      stop();
       view.clearTimeout(deadline);
-      if (retry !== null) view.clearTimeout(retry);
-      resolve(result);
+      resolve(attached);
     };
-    const tryAttach = () => {
-      retry = null;
-      const attached = attachController(doc, settings, messages);
-      if (attached) finish(attached);
-    };
-    const observer = new view.MutationObserver(() => {
-      retry ??= view.setTimeout(tryAttach, RETRY_MS);
-    });
-    const deadline = view.setTimeout(() => finish(null), WATCH_MS);
-    observer.observe(doc.body!, { childList: true, subtree: true, characterData: true });
+    const stop = watchChanges(doc, true, () => {
+      attached = attachController(doc, settings, messages);
+      if (attached) finish();
+      return attached !== null;
+    }, finish);
+    const deadline = view.setTimeout(finish, WATCH_MS);
   });
+}
+
+/**
+ * Tries again whenever the page changes, so a recipe that's rendered or re-rendered late
+ * is still found, but gently: each try waits for the page to settle, a gap that doubles
+ * after every try, and then for the browser to be idle, and after `MAX_TRIES` the watch
+ * stops (calling `onGiveUp`). `attempt` returns true when it's done, false for a try that
+ * didn't get there, and null when there was nothing to try. Returns a function that stops
+ * the watch.
+ */
+function watchChanges(doc: Document, characterData: boolean, attempt: () => boolean | null, onGiveUp = () => {}): () => void {
+  const view = doc.defaultView ?? globalThis;
+  let gap = RETRY_MS;
+  let tries = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  const run = () => {
+    timer = null;
+    if (stopped) return;
+    const result = attempt();
+    if (result === null) return;
+    if (result || ++tries >= MAX_TRIES) {
+      stop();
+      if (!result) onGiveUp();
+    } else {
+      gap *= 2;
+    }
+  };
+  const observer = new view.MutationObserver(() => {
+    timer ??= view.setTimeout(() => whenIdle(view, run), gap);
+  });
+  const stop = () => {
+    stopped = true;
+    observer.disconnect();
+    if (timer !== null) view.clearTimeout(timer);
+  };
+  observer.observe(doc.body!, { childList: true, subtree: true, characterData });
+  return stop;
+}
+
+// jsdom has no requestIdleCallback, so there the try runs straight away.
+function whenIdle(view: Window | typeof globalThis, run: () => void): void {
+  if (typeof view.requestIdleCallback === "function") view.requestIdleCallback(run, { timeout: 1000 });
+  else run();
 }
 
 /**

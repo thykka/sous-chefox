@@ -43,6 +43,26 @@
     "message": "Convert to metric",
     "description": "Popup switch that turns conversion to metric units on or off."
   },
+  "popupAuto": {
+    "message": "Convert recipe pages automatically",
+    "description": "Popup switch: when on, every recipe page is converted as it loads; when off, only when asked with the Convert this page button or the context menu."
+  },
+  "popupConvertPage": {
+    "message": "Convert this page",
+    "description": "Popup button that looks for a recipe on the current tab's page and converts it now."
+  },
+  "popupConverted": {
+    "message": "Converted.",
+    "description": "Popup status after Convert this page found the page's recipe."
+  },
+  "popupNoRecipe": {
+    "message": "No recipe found on this page.",
+    "description": "Popup status after Convert this page found no recipe data or no ingredient list it could locate."
+  },
+  "popupCannotRun": {
+    "message": "Sous-Chefox can't run on this page.",
+    "description": "Popup status when the current tab is a page extensions can't change, like a Firefox settings page."
+  },
   "popupKitchenUnits": {
     "message": "Use dl, rkl and tl",
     "description": "Popup switch that writes converted volumes in Finnish kitchen units (decilitres, tablespoons, teaspoons) instead of millilitres."

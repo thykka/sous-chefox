@@ -1,6 +1,6 @@
 import { attach, attachToSelection, attachWhenReady, type RecipeController } from "./core/attach";
 import type { Messages } from "./core/scaleControl";
-import { CONVERT_SELECTION } from "./messages";
+import { CONVERT_PAGE, CONVERT_SELECTION } from "./messages";
 import { loadSettings, onSettingsChanged, siteSettings, type StoredSettings } from "./settings";
 
 const messages: Messages = {
@@ -16,39 +16,50 @@ const messages: Messages = {
 
 let stored: StoredSettings | null = null;
 let controller: RecipeController | null = null;
-// Whether the page is being watched for an ingredient list rendered late.
-let watching = false;
+// The watch for an ingredient list rendered late, while it runs.
+let watching: Promise<RecipeController | null> | null = null;
+// Whether the popup asked for this page to be converted, which holds with "Convert
+// automatically" off.
+let requested = false;
 // Selections converted from the context menu, for this page load only.
 const manual: RecipeController[] = [];
 
 const currentSettings = () => siteSettings(stored!, location.hostname);
 
-function attachToPage(): void {
-  watching = true;
-  void attachWhenReady(document, currentSettings(), messages).then((attached) => {
-    watching = false;
+function attachToPage(): Promise<RecipeController | null> {
+  watching = attachWhenReady(document, currentSettings(), messages).then((attached) => {
+    watching = null;
     controller = attached;
     // Settings may have changed while the page was watched.
     controller?.setSettings(currentSettings());
+    return attached;
   });
+  return watching;
 }
 
 void loadSettings().then((loaded) => {
   stored = loaded;
-  attachToPage();
-  // A page that started disabled is attached once it's enabled.
+  if (stored.auto) void attachToPage();
+  // A page that started disabled, or before "Convert automatically" was on, is attached
+  // once that changes.
   onSettingsChanged((changed) => {
     stored = changed;
     const settings = currentSettings();
     for (const selected of manual) selected.setSettings(settings);
     // The page is watched for a late list only once, after it loads.
     if (controller) controller.setSettings(settings);
-    else if (!watching) controller = attach(document, settings, messages);
+    else if (!watching && (stored.auto || requested)) controller = attach(document, settings, messages);
   });
 });
 
 browser.runtime.onMessage.addListener((message: unknown) => {
-  if ((message as { type?: unknown } | null)?.type !== CONVERT_SELECTION || !stored) return;
+  const type = (message as { type?: unknown } | null)?.type;
+  if (type === CONVERT_PAGE && stored) {
+    requested = true;
+    if (controller) return Promise.resolve({ found: true });
+    return (watching ?? attachToPage()).then((attached) => ({ found: attached !== null }));
+  }
+  if (type !== CONVERT_SELECTION || !stored) return;
   const selection = document.getSelection();
   if (!selection || selection.rangeCount === 0) return;
   const selected = attachToSelection(document, selection.getRangeAt(0), currentSettings(), messages);

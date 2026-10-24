@@ -10,6 +10,8 @@
       label { display: flex; align-items: center; gap: 0.5em; padding: 4px 0; cursor: pointer; }
       input:disabled + span { opacity: 0.5; }
       #hostname { margin: 0 0 0 1.75em; color: #666; font-size: 12px; overflow-wrap: anywhere; }
+      button { margin: 8px 0 0; font: inherit; }
+      #status { margin: 4px 0 0; min-height: 1.4em; font-size: 12px; }
       @media (prefers-color-scheme: dark) {
         body { color: #eee; background: #2b2a33; }
         #hostname { color: #aaa; }
@@ -18,10 +20,13 @@
     <script src="popup.js" defer></script>
   </head>
   <body>
+    <label><input type="checkbox" id="auto" /> <span data-i18n="popupAuto"></span></label>
     <label><input type="checkbox" id="metric" /> <span data-i18n="popupMetric"></span></label>
     <label><input type="checkbox" id="kitchen" /> <span data-i18n="popupKitchenUnits"></span></label>
     <label><input type="checkbox" id="decimals" /> <span data-i18n="popupDecimals"></span></label>
     <label><input type="checkbox" id="site" /> <span data-i18n="popupDisableSite"></span></label>
     <p id="hostname"></p>
+    <button type="button" id="convert" data-i18n="popupConvertPage"></button>
+    <p id="status" role="status"></p>
   </body>
 </html>
