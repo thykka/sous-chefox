@@ -49,3 +49,7 @@ npx web-ext run -t firefox-android --adb-device <device id> --firefox-apk org.mo
 ```
 
 `adb devices` lists the device id. Check that a recipe page is converted on load, that the scaling control works by touch, and that the popup (which opens as a full-screen page) changes the settings. There is no context-menu entry on Android.
+
+## License
+
+Sous-Chefox is free software, licensed under the GNU General Public License, version 3 or (at your option) any later version. See [LICENSE](LICENSE).

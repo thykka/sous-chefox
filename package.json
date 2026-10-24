@@ -1,6 +1,7 @@
 {
   "name": "sous-chefox",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "A Firefox extension for unit conversions and calculations in recipes.",

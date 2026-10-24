@@ -2,7 +2,7 @@
 
 Copy for the addons.mozilla.org listing. Paste each section into the field it's named after.
 
-Two fields are still to be decided before submitting: **Support** (an email address and/or the GitHub Issues page) and **License**. They're marked TODO below.
+One field is still to be decided before submitting: **Support** (an email address and/or the GitHub Issues page). It's marked TODO below.
 
 ## Summary
 
@@ -48,7 +48,7 @@ TODO: support email and/or website (for example the repository's GitHub Issues p
 
 ## License
 
-TODO: choose a license.
+GNU General Public License v3.0 or later (GPL-3.0-or-later).
 
 ## Notes to reviewer
 
