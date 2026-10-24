@@ -20,15 +20,16 @@ The manifest needs Firefox 140 or later. `npm start` uses Firefox Developer Edit
 
 ## Fixtures
 
-Test fixtures in `test/fixtures/` are trimmed snapshots of real recipe pages.
+Test fixtures in `test/fixtures/` are synthetic pages: each copies the markup of a real recipe site (its tags, nesting and class names, and quirks like a hidden print copy or amounts in separate cells) around a recipe and text written for the tests. Real pages are other people's work and never go into the repository.
 
 ```sh
-npm run fixture -- <url> <name>    # fetch and trim a page into test/fixtures/<name>.html
-npm run dump -- <name>             # what attach does to it: list, lines, steps, 2x
-                                   # (dl/rkl/tl and decimals; --ml, --fractions, --imperial)
+npm run capture -- <url> <name>                     # fetch and trim a page into .scratch/pages/<name>.html (git ignores it)
+npm run dump -- .scratch/pages/<name>.html --outline   # the structure a synthetic fixture needs to copy
+npm run dump -- <fixture name or path>              # what attach does to it: list, lines, steps, 2x
+                                                    # (dl/rkl/tl and decimals; --ml, --fractions, --imperial)
 ```
 
-Many recipe sites refuse scripted requests: save the page from Firefox and pass it with `--from page.html`. A fixture over 100 KB can be cut down further with `--drop <selector>` or `--cut <selector>:<n>`. The dump is a draft: work out each expectation from the recipe before putting it in a test.
+Many recipe sites refuse scripted requests: save the page from Firefox and pass it with `--from page.html`. Write the fixture by hand from the outline, with a header comment naming the site it's shaped after. The dump is a draft: work out each expectation from the recipe before putting it in a test.
 
 ## Release
 

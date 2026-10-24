@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit",
     "pretest": "node scripts/check-node.mjs",
     "test": "vitest run",
-    "prefixture": "node scripts/check-node.mjs",
-    "fixture": "NODE_USE_ENV_PROXY=1 node --disable-warning=UNDICI-EHPA scripts/fixture.mjs",
+    "precapture": "node scripts/check-node.mjs",
+    "capture": "NODE_USE_ENV_PROXY=1 node --disable-warning=UNDICI-EHPA scripts/capture.mjs",
     "predump": "node scripts/check-node.mjs",
     "dump": "node scripts/dump.mjs"
   },

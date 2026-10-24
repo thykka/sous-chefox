@@ -112,7 +112,7 @@ describe("rewriteLine converts ranges at both ends", () => {
     ["litres at both ends", "6-8 cups stock", "1.4–1.9 l stock"],
     ["weight", "2-3 lb potatoes", "910 g–1.4 kg potatoes"],
     ["ends rounding to the same amount", "1 to 1⅛ tsp salt", "5 ml salt"],
-    ["hyphen before a worded end", "6- to 8-oz. chicken breasts", "170–230 g chicken breasts"],
+    ["hyphen before a worded end", "6- to 8-oz. pork chops", "170–230 g pork chops"],
   ])("%s: %s → %s", (_, line, expected) => {
     expect(rewriteLine(line, metric)).toBe(expected);
   });
@@ -208,7 +208,7 @@ describe("rewriteLine weighs dry ingredients", () => {
   it.each([
     ["unknown ingredient", "1 cup blueberries", "240 ml blueberries"],
     ["liquid", "1 cup milk", "240 ml milk"],
-    ["two ingredients", "2 tablespoons avocado oil or melted butter", "30 ml avocado oil or melted butter"],
+    ["two ingredients", "2 tablespoons olive oil or melted butter", "30 ml olive oil or melted butter"],
     ["look-alike of butter", "½ cup peanut butter", "120 ml peanut butter"],
     ["look-alike of flour", "1 cup rice flour", "240 ml rice flour"],
     ["look-alike of sugar", "1 cup coconut sugar", "240 ml coconut sugar"],
@@ -345,7 +345,7 @@ describe("rewriteLine scales package lines by their count", () => {
     ["without parentheses", "2 15-oz cans black beans", 1.5, "3 430 g cans black beans"],
     ["liquid size", "1 (14 oz) can coconut milk", 2, "2 (410 ml) can coconut milk"],
     ["size after the package word", "1 can (14 oz) tomatoes", 2, "2 can (400 g) tomatoes"],
-    ["size as a range", "4 (6- to 8-oz.) chicken breasts", 2, "8 (170–230 g) chicken breasts"],
+    ["size as a range", "4 (6- to 8-oz.) pork chops", 2, "8 (170–230 g) pork chops"],
     ["size of each", "2 eggs (55 g each)", 2, "4 eggs (55 g each)"],
   ])("%s: %s × %s → %s", (_, line, scale, expected) => {
     expect(rewriteLine(line, { ...metric, scale })).toBe(expected);
@@ -433,7 +433,7 @@ describe("rewriteLine reads Finnish recipes", () => {
     ["teaspoon", "½ tl suolaa", 2, "1 tl suolaa"],
     ["quarter teaspoon", "0,25 tl mustapippuria", 3, "0,75 tl mustapippuria"],
     ["teaspoon written out", "1 teelusikka kanelia", 2, "2 teelusikka kanelia"],
-    ["grams into kilograms", "500 g tomaatteja", 2, "1 kg tomaatteja"],
+    ["grams into kilograms", "500 g perunoita", 2, "1 kg perunoita"],
     ["count", "0,5 kpl chilipalko", 2, "1 kpl chilipalko"],
     ["package keeps its size", "1 pkt (400 g) rukiista piirakkataikinaa", 2, "2 pkt (400 g) rukiista piirakkataikinaa"],
     ["can keeps its size", "1 tlk (2½ dl) ruokakermaa", 2, "2 tlk (2½ dl) ruokakermaa"],

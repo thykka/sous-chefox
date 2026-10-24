@@ -1,11 +1,13 @@
-// Saves a real recipe page as a trimmed test fixture in test/fixtures/.
+// Saves a real recipe page, trimmed, to .scratch/pages/ for study: never into the
+// repository, since the page is someone else's work. A test fixture is written by hand
+// from what `npm run dump -- .scratch/pages/<name>.html --outline` shows of its structure.
 //
-//   npm run fixture -- <url> <name> [--from <saved.html>] [--drop <selector>] [--cut <selector>:<n>] [--force]
+//   npm run capture -- <url> <name> [--from <saved.html>] [--drop <selector>] [--cut <selector>:<n>] [--force]
 //
 // --from trims a page saved from the browser instead of fetching it (many recipe sites
 // refuse scripted requests). --drop removes more elements, --cut keeps only the first n
-// children of an element, for pages that are still too big.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+// children of an element.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { JSDOM, VirtualConsole } from "jsdom";
 
@@ -20,12 +22,14 @@ const { values, positionals } = parseArgs({
 });
 const [url, name] = positionals;
 if (!url || !name) {
-  console.error("Usage: npm run fixture -- <url> <name> [--from <saved.html>] [--drop <selector>] [--cut <selector>:<n>] [--force]");
+  console.error("Usage: npm run capture -- <url> <name> [--from <saved.html>] [--drop <selector>] [--cut <selector>:<n>] [--force]");
   process.exit(1);
 }
-const out = new URL(`../test/fixtures/${name}.html`, import.meta.url);
+const dir = new URL("../.scratch/pages/", import.meta.url);
+mkdirSync(dir, { recursive: true });
+const out = new URL(`${name}.html`, dir);
 if (existsSync(out) && !values.force) {
-  console.error(`test/fixtures/${name}.html exists; pass --force to replace it.`);
+  console.error(`.scratch/pages/${name}.html exists; pass --force to replace it.`);
   process.exit(1);
 }
 
@@ -89,10 +93,9 @@ ${doc.documentElement.outerHTML}
 writeFileSync(out, fixture);
 
 const kb = Math.round(fixture.length / 1024);
-console.log(`Wrote test/fixtures/${name}.html (${kb} KB).`);
+console.log(`Wrote .scratch/pages/${name}.html (${kb} KB), which git ignores.`);
 if (!doc.querySelector('script[type="application/ld+json"]')) console.log("No Recipe JSON-LD kept: fine for a page that isn't a recipe.");
-if (kb > 100) console.log("Over 100 KB: --drop comments, related posts or galleries, or --cut a long article.");
-console.log(`Next: npm run dump -- ${name}`);
+console.log(`Next: npm run dump -- .scratch/pages/${name}.html --outline`);
 
 async function download(address) {
   // NODE_USE_ENV_PROXY (set by the npm script) makes fetch use HTTPS_PROXY, as curl does.

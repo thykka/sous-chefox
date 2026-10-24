@@ -1,7 +1,10 @@
 // Shows what `attach` does to a saved page: the list it locates, every ingredient line
 // before and after, the instruction steps it changes, and the ingredients scaled.
 //
-//   npm run dump -- <fixture name or path> [--scale <factor>] [--imperial] [--ml] [--fractions]
+//   npm run dump -- <fixture name or path> [--scale <factor>] [--imperial] [--ml] [--fractions] [--outline]
+//
+// --outline shows instead what a hand-written fixture needs to copy from a captured page:
+// the recipe data, and the markup around and inside the ingredient list and the steps.
 //
 // Like the extension it writes volumes in dl, rkl and tl and amounts as decimals, unless
 // --ml or --fractions says otherwise.
@@ -20,11 +23,12 @@ const { values, positionals } = parseArgs({
     imperial: { type: "boolean" },
     ml: { type: "boolean" },
     fractions: { type: "boolean" },
+    outline: { type: "boolean" },
   },
 });
 const [page] = positionals;
 if (!page) {
-  console.error("Usage: npm run dump -- <fixture name or path> [--scale <factor>] [--imperial] [--ml] [--fractions]");
+  console.error("Usage: npm run dump -- <fixture name or path> [--scale <factor>] [--imperial] [--ml] [--fractions] [--outline]");
   process.exit(1);
 }
 const fixture = new URL(`../test/fixtures/${page.replace(/\.html$/, "")}.html`, import.meta.url);
@@ -49,7 +53,7 @@ try {
   const { textLinesOf } = await vite.ssrLoadModule("/src/core/visibleText.ts");
   // A line as the rewriter reads it: cells and blocks apart, as on the page.
   const read = (line) => textLinesOf(line).map(lineText).join(" ").replace(/\s+/g, " ");
-  dump({ attach, detectRecipe, locateList, linesOf, read });
+  (values.outline ? outline : dump)({ attach, detectRecipe, locateList, linesOf, read });
 } finally {
   await vite.close();
 }
@@ -95,6 +99,31 @@ function dump({ attach, detectRecipe, locateList, linesOf, read }) {
   controller.setScale(scale);
   console.log(`\nIngredients at ${scale}×:`);
   for (const line of lines) console.log(`  ${q(read(line))}`);
+}
+
+function outline({ detectRecipe, locateList, linesOf }) {
+  const doc = load();
+  const recipe = detectRecipe(doc);
+  if (!recipe) return console.log("No recipe data.");
+  console.log(`Recipe data: yield ${JSON.stringify(recipe.yields)}`);
+  console.log(`  ingredients: ${JSON.stringify(recipe.ingredients)}`);
+  console.log(`  steps: ${recipe.instructions.length}`);
+  for (const [name, lines] of [["Ingredient list", recipe.ingredients], ["Steps", recipe.instructions]]) {
+    const list = locateList(doc, lines);
+    if (!list) {
+      console.log(`\n${name}: not located`);
+      continue;
+    }
+    const chain = [];
+    for (let el = list; el && el !== doc.body; el = el.parentElement) chain.push(own(el));
+    console.log(`\n${name}: ${chain.reverse().join(" > ")}`);
+    console.log(`  ${linesOf(list).length} lines; the first two:`);
+    for (const line of linesOf(list).slice(0, 2)) console.log(`  ${line.outerHTML.replace(/\s+/g, " ")}`);
+  }
+}
+
+function own(el) {
+  return el.tagName.toLowerCase() + (el.id ? `#${el.id}` : "") + [...el.classList].map((c) => `.${c}`).join("");
 }
 
 /** A line's tag and classes, as in "li.wprm-recipe-ingredient". */

@@ -8,7 +8,7 @@ Rules for reviewing a change. Type errors, test failures and manifest problems a
 - **Two seams.** Page behaviour is tested through `attach` / `attachWhenReady` / `attachToSelection` and the returned controller, in jsdom (`test/attach.test.ts`); line rules through `rewriteLine`, table-driven (`test/rewriteLine.test.ts`). A new test goes at one of these seams.
 - **Independent expectations.** Expected values are literals worked out from the spec or a real page: "180 g", "1½ cups". An expectation computed the way the code computes it passes by construction.
 - **Spec wording.** A test name states the behaviour the issue asks for, in the issue's words. A name that describes what the code happens to do ("above the selected list" when the issue says "above the selection") hides a mismatch with the spec.
-- **Real pages.** A site that breaks becomes a trimmed fixture in `test/fixtures/`, made with `npm run fixture` (see the README).
+- **Site-shaped fixtures.** A site that breaks becomes a synthetic fixture in `test/fixtures/`: its markup copied from a page captured with `npm run capture` (see the README), its recipe and text invented. A captured page stays in `.scratch/`, never in the repository.
 
 ## Page rewriting
 

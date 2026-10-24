@@ -83,8 +83,10 @@ function decimalStep(value: number): number {
   return 1;
 }
 
+// A hair over half a step, so amounts that floating point leaves just short of the
+// midpoint (1.875 cups of flour is 224.99999 g) still round up, as they would on paper.
 function roundTo(value: number, step: number): number {
-  return Math.round(value / step) * step;
+  return Math.round(value / step + 1e-9) * step;
 }
 
 /** °C rounded to the nearest 5, or a range of two: "175 °C", "175–190 °C". */
