@@ -2,8 +2,6 @@
 
 Copy for the addons.mozilla.org listing. Paste each section into the field it's named after.
 
-One field is still to be decided before submitting: **Support** (an email address and/or the GitHub Issues page). It's marked TODO below.
-
 ## Summary
 
 Converts recipe amounts to metric and scales them, right on the recipe page. Finnish kitchen units by default. Works on Firefox for desktop and Android. No data leaves your browser.
@@ -44,7 +42,9 @@ Sous-Chefox collects no data and makes no network requests. Your settings are ke
 
 ## Support
 
-TODO: support email and/or website (for example the repository's GitHub Issues page).
+Support site: https://github.com/thykka/sous-chefox/issues
+
+Homepage: https://github.com/thykka/sous-chefox
 
 ## License
 
