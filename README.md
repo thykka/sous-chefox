@@ -2,6 +2,10 @@
 
 A Firefox extension for unit conversions and calculations in recipes.
 
+## Installation
+
+Download and install the extension from https://addons.mozilla.org/en-US/firefox/addon/sous-chefox/
+
 ## Development
 
 Needs Node 22.23.4 or later (see `.nvmrc`).
